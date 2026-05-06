@@ -9,6 +9,7 @@ import SMSAnalyzer from '@/components/analyzer/SMSAnalyzer';
 import OfferGenerator from '@/components/analyzer/OfferGenerator';
 import SavedDeals from '@/components/analyzer/SavedDeals';
 import UsageCounter from '@/components/ui/UsageCounter';
+import DisclaimerBanner from '@/components/ui/DisclaimerBanner';
 import { DealInputs, DealResults, calculateDeal } from '@/lib/calculations';
 import { AIDecisionResult, getAIDecision } from '@/lib/aiDecision';
 import { RedFlag, detectRedFlags } from '@/lib/redFlags';
@@ -146,6 +147,7 @@ export default function AnalyzerPage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
               <div className="lg:col-span-2">
                 <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 sticky top-24 space-y-5">
+                  <DisclaimerBanner />
                   <UsageCounter />
 
                   {/* Strategy selector */}

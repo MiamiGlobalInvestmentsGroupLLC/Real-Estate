@@ -54,6 +54,7 @@ export default function Footer() {
               {[
                 { href: '/about', label: 'About' },
                 { href: '/contact', label: 'Contact' },
+                { href: '/disclaimer', label: 'Legal Disclaimer' },
                 { href: '/privacy', label: 'Privacy Policy' },
                 { href: '/terms', label: 'Terms of Service' },
               ].map((item) => (
@@ -67,12 +68,22 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-zinc-400">
-            © {new Date().getFullYear()} Miami Global Investments Group LLC. All rights reserved.
-          </p>
-          <p className="text-xs text-zinc-400">
-            Results are estimates. Always verify with licensed professionals.
+        <div className="mt-10 pt-6 border-t border-zinc-100 space-y-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-xs text-zinc-400">
+              © {new Date().getFullYear()} Miami Global Investments Group LLC. All rights reserved.
+            </p>
+            <p className="text-xs text-zinc-400">
+              Results are estimates. Always verify with licensed professionals.
+            </p>
+          </div>
+          <p className="text-[10px] text-zinc-400 text-center leading-relaxed border-t border-zinc-100 pt-3">
+            <strong className="text-zinc-500">Legal Disclaimer:</strong> DealEdge AI is a calculation tool for informational purposes only.
+            Nothing on this platform constitutes financial, investment, or legal advice.
+            DealEdge AI does not recommend buying or investing in any property.
+            You are solely responsible for all investment decisions and their outcomes.
+            Miami Global Investments Group LLC bears no liability for any financial losses.{' '}
+            <Link href="/disclaimer" className="underline hover:text-zinc-600 transition-colors">Full disclaimer</Link>
           </p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { DealInputs, DealResults, formatCurrency } from '@/lib/calculations';
 import { AIDecisionResult } from '@/lib/aiDecision';
 import { RedFlag } from '@/lib/redFlags';
@@ -327,6 +328,24 @@ export default function ResultsPanel({ results, aiDecision, redFlags, inputs, st
         <p className="text-white text-xs font-semibold">
           💡 Avoid one bad deal = save $10,000+ · Used by investors daily
         </p>
+      </div>
+
+      {/* Legal micro-disclaimer */}
+      <div className="rounded-xl bg-amber-50 border border-amber-200 p-3.5">
+        <div className="flex items-start gap-2">
+          <svg className="w-3.5 h-3.5 text-amber-500 mt-0.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+          <p className="text-[10px] text-amber-800 leading-relaxed">
+            <span className="font-bold">Disclaimer:</span> These results are mathematical estimates for informational
+            purposes only — not financial, investment, or legal advice. DealEdge AI does not recommend buying or
+            investing in any property. Always verify with licensed professionals before making any investment
+            decision. You assume full responsibility for your financial choices.{' '}
+            <Link href="/disclaimer" className="font-bold underline hover:text-amber-900" target="_blank">
+              Full disclaimer
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
