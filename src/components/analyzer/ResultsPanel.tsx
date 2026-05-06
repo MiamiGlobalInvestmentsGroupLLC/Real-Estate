@@ -1,8 +1,10 @@
 'use client';
 
-import { DealResults, formatCurrency } from '@/lib/calculations';
+import { useState } from 'react';
+import { DealInputs, DealResults, formatCurrency } from '@/lib/calculations';
 import { AIDecisionResult } from '@/lib/aiDecision';
 import { RedFlag } from '@/lib/redFlags';
+import { saveDeal } from '@/lib/savedDeals';
 import DealScore from '@/components/ui/DealScore';
 import RiskBadge from '@/components/ui/RiskBadge';
 import MetricCard from '@/components/ui/MetricCard';
@@ -10,10 +12,14 @@ import AIDecision from './AIDecision';
 import RedFlagDetector from './RedFlagDetector';
 import { cn } from '@/lib/utils';
 
+type Strategy = 'flip' | 'wholesale' | 'rental';
+
 interface ResultsPanelProps {
   results: DealResults | null;
   aiDecision: AIDecisionResult | null;
   redFlags: RedFlag[];
+  inputs: DealInputs | null;
+  strategy: Strategy;
 }
 
 const ratingConfig = {
@@ -23,8 +29,10 @@ const ratingConfig = {
   Bad: 'bg-red-50 text-red-700 border-red-200',
 };
 
-export default function ResultsPanel({ results, aiDecision, redFlags }: ResultsPanelProps) {
-  if (!results) {
+export default function ResultsPanel({ results, aiDecision, redFlags, inputs, strategy }: ResultsPanelProps) {
+  const [saved, setSaved] = useState(false);
+
+  if (!results || !inputs) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[460px] text-center p-8">
         <div className="w-16 h-16 bg-gradient-to-br from-indigo-100 to-cyan-100 rounded-2xl flex items-center justify-center mb-5 shadow-sm">
@@ -51,39 +59,189 @@ export default function ResultsPanel({ results, aiDecision, redFlags }: ResultsP
   const isProfit = results.flipProfit >= 0;
   const scoreColor = results.dealScore >= 65 ? 'bg-emerald-500' : results.dealScore >= 40 ? 'bg-amber-500' : 'bg-red-500';
 
+  function handleSave() {
+    if (!results || !inputs || !aiDecision) return;
+    const label = inputs.arv > 0
+      ? `${formatCurrency(inputs.arv)} ARV · ${formatCurrency(inputs.purchasePrice)}`
+      : `Deal saved`;
+    saveDeal({ label, strategy, inputs, results, decision: aiDecision });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  }
+
   return (
     <div className="space-y-4 animate-fadeIn">
 
-      {/* 1. AI Decision — TOP (most important) */}
-      {aiDecision && <AIDecision decision={aiDecision} />}
+      {/* Save deal button */}
+      {aiDecision && (
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={saved}
+            className={cn(
+              'flex items-center gap-1.5 text-xs font-semibold px-3.5 py-1.5 rounded-lg border transition-all',
+              saved
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-white border-zinc-200 text-zinc-600 hover:bg-zinc-50 hover:border-zinc-300',
+            )}
+          >
+            {saved ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                Saved!
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
+                </svg>
+                Save Deal
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
-      {/* 2. Profit + rating */}
-      <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Flip Profit</p>
-            <p className={cn(
-              'text-4xl sm:text-5xl font-extrabold tabular-nums leading-none',
-              isProfit ? 'text-emerald-500' : 'text-red-500',
-            )}>
-              {formatCurrency(results.flipProfit)}
-            </p>
-            <p className="text-sm text-zinc-500 mt-1.5 font-medium">
-              {results.marginPercent >= 0 ? '+' : ''}{results.marginPercent.toFixed(1)}% margin
-              &nbsp;·&nbsp;
-              {results.roi.toFixed(1)}% ROI
-            </p>
+      {/* 1. AI Decision */}
+      {aiDecision && <AIDecision decision={aiDecision} results={results} />}
+
+      {/* 2. Strategy-specific primary metric */}
+      {strategy === 'wholesale' ? (
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Assignment Fee</p>
+              <p className={cn(
+                'text-4xl sm:text-5xl font-extrabold tabular-nums leading-none',
+                results.wholesaleAssignmentFee >= 0 ? 'text-emerald-500' : 'text-red-500',
+              )}>
+                {formatCurrency(results.wholesaleAssignmentFee)}
+              </p>
+              <p className="text-sm text-zinc-500 mt-1.5 font-medium">
+                MAO {formatCurrency(results.maxAllowableOffer)} − Purchase {formatCurrency(inputs.purchasePrice)}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <RiskBadge level={results.riskLevel} />
+              <span className={cn('text-xs font-bold px-2.5 py-1 rounded-lg border', ratingConfig[results.dealRating])}>
+                {results.dealRating}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col items-end gap-2 shrink-0">
-            <RiskBadge level={results.riskLevel} />
-            <span className={cn('text-xs font-bold px-2.5 py-1 rounded-lg border', ratingConfig[results.dealRating])}>
-              {results.dealRating}
+          {results.wholesaleAssignmentFee < 0 && (
+            <p className="mt-3 text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2.5">
+              Purchase price exceeds MAO — hard to assign profitably at this price.
+            </p>
+          )}
+        </div>
+      ) : strategy === 'rental' && results.rentalCashFlow !== null ? (
+        <div className={cn(
+          'rounded-2xl border p-5',
+          results.rentalCashFlow >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-red-50 border-red-200',
+        )}>
+          <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Monthly Cash Flow</p>
+          <div className="flex items-end gap-4 mb-4">
+            <p className={cn('text-4xl sm:text-5xl font-extrabold tabular-nums leading-none', results.rentalCashFlow >= 0 ? 'text-teal-600' : 'text-red-600')}>
+              {formatCurrency(results.rentalCashFlow)}<span className="text-sm font-semibold text-zinc-400">/mo</span>
+            </p>
+            <span className={cn(
+              'text-xs font-bold px-2.5 py-1 rounded-lg mb-1',
+              results.rentalCashFlow >= 200 ? 'bg-teal-100 text-teal-700' :
+              results.rentalCashFlow >= 0 ? 'bg-zinc-100 text-zinc-600' :
+              'bg-red-100 text-red-600',
+            )}>
+              {results.rentalCashFlow >= 200 ? 'Cash Flows' : results.rentalCashFlow >= 0 ? 'Break Even' : 'Negative'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/70 rounded-xl p-3 border border-teal-100">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Cap Rate</p>
+              <p className="text-lg font-extrabold text-zinc-900">{results.capRate !== null ? `${results.capRate.toFixed(1)}%` : '—'}</p>
+              <p className="text-[10px] text-zinc-500">Annual NOI / Price</p>
+            </div>
+            <div className="bg-white/70 rounded-xl p-3 border border-teal-100">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">Cash-on-Cash</p>
+              <p className="text-lg font-extrabold text-zinc-900">{results.cashOnCash !== null ? `${results.cashOnCash.toFixed(1)}%` : '—'}</p>
+              <p className="text-[10px] text-zinc-500">Annual CF / Down pmt</p>
+            </div>
+          </div>
+          {results.monthlyMortgage && (
+            <p className="text-xs text-zinc-500 mt-2.5">
+              After {formatCurrency(results.monthlyMortgage)}/mo mortgage (20% down, 7%, 30yr)
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Flip Profit</p>
+              <p className={cn(
+                'text-4xl sm:text-5xl font-extrabold tabular-nums leading-none',
+                isProfit ? 'text-emerald-500' : 'text-red-500',
+              )}>
+                {formatCurrency(results.flipProfit)}
+              </p>
+              <p className="text-sm text-zinc-500 mt-1.5 font-medium">
+                {results.marginPercent >= 0 ? '+' : ''}{results.marginPercent.toFixed(1)}% margin
+                &nbsp;·&nbsp;
+                {results.roi.toFixed(1)}% ROI
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              <RiskBadge level={results.riskLevel} />
+              <span className={cn('text-xs font-bold px-2.5 py-1 rounded-lg border', ratingConfig[results.dealRating])}>
+                {results.dealRating}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Deal Breakdown card */}
+      <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
+        <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-3">Deal Breakdown</p>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex justify-between">
+            <span className="text-zinc-500">Purchase Price</span>
+            <span className="font-semibold text-zinc-900 tabular-nums">{formatCurrency(inputs.purchasePrice)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500">+ Repair Costs</span>
+            <span className="font-semibold text-zinc-900 tabular-nums">{formatCurrency(inputs.repairCosts)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500">+ Holding Costs</span>
+            <span className="font-semibold text-zinc-900 tabular-nums">{formatCurrency(inputs.holdingCosts)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500">+ Closing Costs</span>
+            <span className="font-semibold text-zinc-900 tabular-nums">{formatCurrency(inputs.closingCosts)}</span>
+          </div>
+          <div className="h-px bg-zinc-100 my-2" />
+          <div className="flex justify-between font-bold">
+            <span className="text-zinc-700">Total Investment</span>
+            <span className="text-zinc-900 tabular-nums">{formatCurrency(results.totalInvestment)}</span>
+          </div>
+          <div className="flex justify-between pt-1">
+            <span className="text-zinc-500">After Repair Value (ARV)</span>
+            <span className="font-semibold text-zinc-900 tabular-nums">{formatCurrency(inputs.arv)}</span>
+          </div>
+          <div className="h-px bg-zinc-100 my-2" />
+          <div className="flex justify-between font-extrabold">
+            <span className={isProfit ? 'text-emerald-600' : 'text-red-600'}>
+              {strategy === 'wholesale' ? 'Assignment Fee' : strategy === 'rental' ? 'Profit (if flipped)' : 'Flip Profit'}
+            </span>
+            <span className={cn('tabular-nums', isProfit ? 'text-emerald-600' : 'text-red-600')}>
+              {formatCurrency(strategy === 'wholesale' ? results.wholesaleAssignmentFee : results.flipProfit)}
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Deal Score */}
+      {/* 4. Deal Score */}
       <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div>
@@ -107,16 +265,32 @@ export default function ResultsPanel({ results, aiDecision, redFlags }: ResultsP
         </div>
       </div>
 
-      {/* 4. Key metrics */}
-      <div className="grid grid-cols-2 gap-3">
-        <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
-        <MetricCard label="Total Investment" value={formatCurrency(results.totalInvestment)} subtext="All-in cost" />
-        <MetricCard label="ROI" value={`${results.roi.toFixed(1)}%`} subtext="Return on investment" positive={results.roi >= 15} negative={results.roi < 0} />
-        <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />
-      </div>
+      {/* 5. Key metrics */}
+      {strategy === 'wholesale' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
+          <MetricCard label="Assignment Fee" value={formatCurrency(results.wholesaleAssignmentFee)} subtext="MAO minus price" positive={results.wholesaleAssignmentFee > 0} negative={results.wholesaleAssignmentFee < 0} />
+          <MetricCard label="Purchase Price" value={formatCurrency(inputs.purchasePrice)} subtext="Your cost basis" />
+          <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />
+        </div>
+      ) : strategy === 'rental' ? (
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
+          <MetricCard label="Annual Cash Flow" value={results.rentalCashFlow !== null ? formatCurrency(results.rentalCashFlow * 12) : '—'} subtext="Monthly × 12" positive={(results.rentalCashFlow ?? 0) > 0} negative={(results.rentalCashFlow ?? 0) < 0} />
+          <MetricCard label="Cap Rate" value={results.capRate !== null ? `${results.capRate.toFixed(1)}%` : '—'} subtext="NOI / purchase price" positive={(results.capRate ?? 0) >= 6} />
+          <MetricCard label="Cash-on-Cash" value={results.cashOnCash !== null ? `${results.cashOnCash.toFixed(1)}%` : '—'} subtext="CF / down payment" positive={(results.cashOnCash ?? 0) >= 8} negative={(results.cashOnCash ?? 0) < 0} />
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
+          <MetricCard label="Total Investment" value={formatCurrency(results.totalInvestment)} subtext="All-in cost" />
+          <MetricCard label="ROI" value={`${results.roi.toFixed(1)}%`} subtext="Return on investment" positive={results.roi >= 15} negative={results.roi < 0} />
+          <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />
+        </div>
+      )}
 
-      {/* 5. Rental cash flow */}
-      {results.rentalCashFlow !== null && (
+      {/* 6. Rental cash flow (flip strategy only, if rent entered) */}
+      {strategy === 'flip' && results.rentalCashFlow !== null && (
         <div className={cn(
           'rounded-2xl border p-5',
           results.rentalCashFlow >= 0 ? 'bg-teal-50 border-teal-200' : 'bg-red-50 border-red-200',
@@ -145,7 +319,7 @@ export default function ResultsPanel({ results, aiDecision, redFlags }: ResultsP
         </div>
       )}
 
-      {/* 6. Red flags */}
+      {/* 7. Red flags */}
       <RedFlagDetector flags={redFlags} />
 
       {/* Urgency nudge */}

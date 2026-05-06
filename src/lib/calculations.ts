@@ -10,8 +10,11 @@ export interface DealInputs {
 export interface DealResults {
   maxAllowableOffer: number;
   flipProfit: number;
+  wholesaleAssignmentFee: number;
   rentalCashFlow: number | null;
   monthlyMortgage: number | null;
+  capRate: number | null;
+  cashOnCash: number | null;
   roi: number;
   dealScore: number;
   riskLevel: 'Low' | 'Medium' | 'High';
@@ -31,8 +34,12 @@ export function calculateDeal(inputs: DealInputs): DealResults {
   const roi = totalInvestment > 0 ? (flipProfit / totalInvestment) * 100 : 0;
   const equityGained = arv - purchasePrice;
 
+  const wholesaleAssignmentFee = maxAllowableOffer - purchasePrice;
+
   let rentalCashFlow: number | null = null;
   let monthlyMortgage: number | null = null;
+  let capRate: number | null = null;
+  let cashOnCash: number | null = null;
 
   if (monthlyRent && monthlyRent > 0 && purchasePrice > 0) {
     const loanAmount = purchasePrice * 0.8;
@@ -43,6 +50,12 @@ export function calculateDeal(inputs: DealInputs): DealResults {
       (Math.pow(1 + monthlyRate, n) - 1);
     const monthlyExpenses = monthlyRent * 0.15;
     rentalCashFlow = monthlyRent - monthlyMortgage - monthlyExpenses;
+
+    const annualNOI = monthlyRent * 12 * 0.85;
+    capRate = (annualNOI / purchasePrice) * 100;
+
+    const downPayment = purchasePrice * 0.2;
+    cashOnCash = downPayment > 0 ? ((rentalCashFlow * 12) / downPayment) * 100 : null;
   }
 
   // Deal Score (0–100)
@@ -103,8 +116,11 @@ export function calculateDeal(inputs: DealInputs): DealResults {
   return {
     maxAllowableOffer,
     flipProfit,
+    wholesaleAssignmentFee,
     rentalCashFlow,
     monthlyMortgage,
+    capRate,
+    cashOnCash,
     roi,
     dealScore: score,
     riskLevel,

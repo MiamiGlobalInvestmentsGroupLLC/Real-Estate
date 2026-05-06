@@ -7,15 +7,24 @@ import DealForm from '@/components/analyzer/DealForm';
 import ResultsPanel from '@/components/analyzer/ResultsPanel';
 import SMSAnalyzer from '@/components/analyzer/SMSAnalyzer';
 import OfferGenerator from '@/components/analyzer/OfferGenerator';
+import SavedDeals from '@/components/analyzer/SavedDeals';
 import UsageCounter from '@/components/ui/UsageCounter';
 import { DealInputs, DealResults, calculateDeal } from '@/lib/calculations';
 import { AIDecisionResult, getAIDecision } from '@/lib/aiDecision';
 import { RedFlag, detectRedFlags } from '@/lib/redFlags';
 import { ParsedSMSData } from '@/lib/smsParser';
 import { useApp } from '@/context/AppContext';
+import { EARLY_ACCESS } from '@/lib/config';
 import { cn } from '@/lib/utils';
 
 type ActiveTab = 'analyzer' | 'sms' | 'offer';
+type Strategy = 'flip' | 'wholesale' | 'rental';
+
+const strategyOptions: { id: Strategy; label: string; emoji: string; desc: string }[] = [
+  { id: 'flip', label: 'Flip', emoji: '🔨', desc: 'Buy, renovate, sell' },
+  { id: 'wholesale', label: 'Wholesale', emoji: '📋', desc: 'Assign the contract' },
+  { id: 'rental', label: 'Rental', emoji: '🏠', desc: 'Buy and hold' },
+];
 
 export default function AnalyzerPage() {
   const { incrementUsage, user } = useApp();
@@ -24,11 +33,12 @@ export default function AnalyzerPage() {
   const [aiDecision, setAIDecision] = useState<AIDecisionResult | null>(null);
   const [redFlags, setRedFlags] = useState<RedFlag[]>([]);
   const [activeTab, setActiveTab] = useState<ActiveTab>('analyzer');
+  const [strategy, setStrategy] = useState<Strategy>('flip');
   const [smsInitialValues, setSMSInitialValues] = useState<Partial<DealInputs>>({});
 
   const handleCalculate = useCallback((newInputs: DealInputs) => {
     const allowed = incrementUsage();
-    if (!allowed) return; // modal shown by context
+    if (!allowed) return;
 
     const dealResults = calculateDeal(newInputs);
     const decision = getAIDecision(newInputs, dealResults);
@@ -78,7 +88,7 @@ export default function AnalyzerPage() {
       id: 'offer' as ActiveTab,
       label: 'Offer Generator',
       icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>,
-      pro: true,
+      pro: !EARLY_ACCESS,
     },
   ];
 
@@ -94,10 +104,17 @@ export default function AnalyzerPage() {
                 <h1 className="text-2xl font-extrabold text-zinc-900">Deal Analyzer</h1>
                 <p className="text-sm text-zinc-500 mt-0.5">Know in 30 seconds if your deal is worth it</p>
               </div>
-              <div className="hidden sm:flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-full">
-                <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-                AI Engine Active
-              </div>
+              {EARLY_ACCESS ? (
+                <div className="hidden sm:flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold px-3 py-1.5 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                  Early Access — Free
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                  AI Engine Active
+                </div>
+              )}
             </div>
 
             <div className="flex gap-1">
@@ -130,11 +147,48 @@ export default function AnalyzerPage() {
               <div className="lg:col-span-2">
                 <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 sticky top-24 space-y-5">
                   <UsageCounter />
+
+                  {/* Strategy selector */}
+                  <div>
+                    <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Analysis Strategy</p>
+                    <div className="grid grid-cols-3 gap-1.5 bg-zinc-100 p-1 rounded-xl">
+                      {strategyOptions.map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setStrategy(opt.id)}
+                          className={cn(
+                            'flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg text-xs font-semibold transition-all',
+                            strategy === opt.id
+                              ? 'bg-white text-zinc-900 shadow-sm'
+                              : 'text-zinc-500 hover:text-zinc-700',
+                          )}
+                        >
+                          <span className="text-base leading-none">{opt.emoji}</span>
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-zinc-400 mt-1.5 text-center">
+                      {strategyOptions.find((o) => o.id === strategy)?.desc}
+                    </p>
+                  </div>
+
                   <DealForm onCalculate={handleCalculate} initialValues={smsInitialValues} />
+                </div>
+
+                {/* Saved deals below form */}
+                <div className="mt-4">
+                  <SavedDeals />
                 </div>
               </div>
               <div className="lg:col-span-3">
-                <ResultsPanel results={results} aiDecision={aiDecision} redFlags={redFlags} />
+                <ResultsPanel
+                  results={results}
+                  aiDecision={aiDecision}
+                  redFlags={redFlags}
+                  inputs={inputs}
+                  strategy={strategy}
+                />
               </div>
             </div>
           )}
@@ -148,14 +202,20 @@ export default function AnalyzerPage() {
                 </div>
               </div>
               <div className="lg:col-span-3">
-                <ResultsPanel results={results} aiDecision={aiDecision} redFlags={redFlags} />
+                <ResultsPanel
+                  results={results}
+                  aiDecision={aiDecision}
+                  redFlags={redFlags}
+                  inputs={inputs}
+                  strategy={strategy}
+                />
               </div>
             </div>
           )}
 
           {activeTab === 'offer' && (
             <div className="max-w-2xl mx-auto">
-              {user?.plan === 'free' ? (
+              {!EARLY_ACCESS && user?.plan === 'free' ? (
                 <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-10 text-center">
                   <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                     <svg className="w-7 h-7 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -173,7 +233,13 @@ export default function AnalyzerPage() {
               )}
               {results && (
                 <div className="mt-4">
-                  <ResultsPanel results={results} aiDecision={aiDecision} redFlags={redFlags} />
+                  <ResultsPanel
+                    results={results}
+                    aiDecision={aiDecision}
+                    redFlags={redFlags}
+                    inputs={inputs}
+                    strategy={strategy}
+                  />
                 </div>
               )}
             </div>
