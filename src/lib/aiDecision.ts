@@ -8,85 +8,143 @@ export interface AIDecisionResult {
   reason: string;
   strategy: Strategy;
   suggestedOffer: number;
-  confidence: number;
+  confidence: number; // 0-100, displayed as percentage
 }
 
 export function getAIDecision(inputs: DealInputs, results: DealResults): AIDecisionResult {
   const { purchasePrice, arv, repairCosts } = inputs;
-  const { flipProfit, marginPercent, roi, dealScore, maxAllowableOffer, riskLevel, rentalCashFlow } = results;
+  const {
+    netProfit,
+    marginPercent,
+    roi,
+    maxAllowableOffer,
+    rentalCashFlow,
+    targetOfferAt18,
+  } = results;
 
   const repairRatio = arv > 0 ? repairCosts / arv : 0;
+  const isAboveMao = purchasePrice > maxAllowableOffer && maxAllowableOffer > 0;
+  const maoGapPct = maxAllowableOffer > 0
+    ? ((purchasePrice - maxAllowableOffer) / maxAllowableOffer) * 100
+    : 0;
 
+  // ── Strategy ──────────────────────────────────────────────────────────────
+  // Wholesale: price is well below MAO — easy assignment margin
   let strategy: Strategy;
-  if (purchasePrice < maxAllowableOffer * 0.82) {
+  if (maxAllowableOffer > 0 && purchasePrice < maxAllowableOffer * 0.85) {
     strategy = 'Wholesale';
-  } else if (repairRatio < 0.12 && marginPercent > 18) {
-    strategy = 'Flip';
-  } else if (rentalCashFlow && rentalCashFlow > 200 && marginPercent < 15) {
+  } else if (rentalCashFlow !== null && rentalCashFlow > 200 && marginPercent < 16) {
     strategy = 'Rental';
-  } else if (marginPercent > 15) {
+  } else if (rentalCashFlow !== null && rentalCashFlow > 0 && marginPercent >= 16) {
     strategy = 'Flip or Rental';
   } else {
     strategy = 'Flip';
   }
+
+  // ── Decision (priority: Net Profit → Margin → MAO → ROI) ─────────────────
 
   let decision: Decision;
   let reason: string;
   let suggestedOffer: number;
   let confidence: number;
 
-  if (dealScore >= 65 && marginPercent >= 15 && purchasePrice <= maxAllowableOffer) {
+  const targetOffer = targetOfferAt18 > 0 ? targetOfferAt18 : maxAllowableOffer;
+
+  // TIER 1 — BUY: Net Profit ≥ $30K AND Margin ≥ 18%
+  if (netProfit >= 30000 && marginPercent >= 18) {
     decision = 'BUY';
-    confidence = Math.min(99, 60 + dealScore * 0.35);
-
-    if (marginPercent >= 25) {
-      reason = `Strong ${marginPercent.toFixed(0)}% margin with ${roi.toFixed(0)}% ROI — excellent upside`;
-    } else if (riskLevel === 'Low') {
-      reason = `Healthy deal at ${marginPercent.toFixed(0)}% margin with low risk profile`;
-    } else {
-      reason = `Solid margin at ${marginPercent.toFixed(0)}% and ${roi.toFixed(0)}% ROI — numbers work`;
-    }
-
+    reason = marginPercent >= 25
+      ? `Strong ${marginPercent.toFixed(0)}% margin with ${fmtK(netProfit)} net profit — excellent upside`
+      : `${fmtK(netProfit)} net profit at ${marginPercent.toFixed(0)}% margin — meets buy threshold`;
     suggestedOffer = purchasePrice;
-  } else if (dealScore >= 40 && (marginPercent >= 8 || flipProfit > 0)) {
+    confidence = calcConfidence(netProfit, marginPercent, maoGapPct);
+  }
+
+  // TIER 2 — BUY or NEGOTIATE: Net Profit ≥ $25K AND Margin 14–18%
+  else if (netProfit >= 25000 && marginPercent >= 14) {
+    if (!isAboveMao) {
+      decision = 'BUY';
+      reason = `${fmtK(netProfit)} net profit at ${marginPercent.toFixed(0)}% margin — solid deal at or below MAO`;
+      suggestedOffer = purchasePrice;
+    } else {
+      decision = 'NEGOTIATE';
+      reason = `${fmtK(netProfit)} profit but ${maoGapPct.toFixed(0)}% above MAO — negotiate to lock in margin`;
+      suggestedOffer = targetOffer;
+    }
+    confidence = calcConfidence(netProfit, marginPercent, maoGapPct);
+  }
+
+  // TIER 3 — NEGOTIATE: Net Profit ≥ $20K AND Margin 12–16%
+  // (OVERRIDE: being above MAO alone does not trigger PASS if profit & margin are acceptable)
+  else if (netProfit >= 20000 && marginPercent >= 12) {
     decision = 'NEGOTIATE';
-    confidence = Math.min(88, 35 + dealScore * 0.45);
+    const targetK = Math.round(targetOffer / 1000);
+    reason = `${marginPercent.toFixed(0)}% margin is below the 18% target — aim for $${targetK}k to improve`;
+    suggestedOffer = targetOffer;
+    confidence = calcConfidence(netProfit, marginPercent, maoGapPct);
+  }
 
-    const gap = purchasePrice - maxAllowableOffer;
-    const reduceK = Math.ceil(Math.abs(gap) / 1000);
-
-    if (purchasePrice > maxAllowableOffer) {
-      reason = `Above MAO — negotiate down by $${reduceK}k to hit target margin`;
-    } else if (marginPercent < 12) {
-      reason = `Margin is thin at ${marginPercent.toFixed(0)}% — push for lower price to build buffer`;
-    } else {
-      reason = `Decent deal but room to improve — squeeze margin before committing`;
-    }
-
-    suggestedOffer = Math.max(maxAllowableOffer * 0.9, purchasePrice * 0.9);
-  } else {
+  // TIER 4 — PASS: Insufficient profit or margin
+  else {
     decision = 'PASS';
-    confidence = Math.min(97, 55 + (100 - dealScore) * 0.35);
-
-    if (flipProfit < 0) {
-      reason = `Deal loses money at current price — not viable`;
-    } else if (marginPercent < 5) {
-      reason = `Margin too thin at ${marginPercent.toFixed(0)}% — no buffer for overruns`;
-    } else if (purchasePrice > maxAllowableOffer * 1.1) {
-      const overPct = (((purchasePrice - maxAllowableOffer) / maxAllowableOffer) * 100).toFixed(0);
-      reason = `Asking price is ${overPct}% above MAO — deal doesn't pencil`;
+    if (netProfit < 0) {
+      reason = `Deal loses ${fmtK(Math.abs(netProfit))} at current price — not viable`;
+    } else if (marginPercent < 12) {
+      reason = `${marginPercent.toFixed(0)}% margin is too thin — no buffer for cost overruns`;
     } else {
-      reason = `Risk-reward doesn't justify investment — better deals exist`;
+      reason = `${fmtK(netProfit)} net profit is below $20K minimum — risk-reward doesn't justify the deal`;
     }
-
-    suggestedOffer = Math.max(0, maxAllowableOffer * 0.88);
+    suggestedOffer = Math.min(targetOffer, maxAllowableOffer * 0.90);
+    confidence = calcPassConfidence(netProfit, marginPercent);
   }
 
   return {
     decision,
     reason,
     strategy,
-    suggestedOffer: Math.round(suggestedOffer / 500) * 500,
+    suggestedOffer: Math.max(0, Math.round(suggestedOffer / 500) * 500),
     confidence: Math.round(confidence),
   };
+}
+
+function fmtK(value: number): string {
+  return `$${Math.round(Math.abs(value) / 1000)}k`;
+}
+
+function calcConfidence(netProfit: number, marginPercent: number, maoGapPct: number): number {
+  let score = 0;
+
+  // Profit strength (0-50)
+  if (netProfit >= 50000) score += 50;
+  else if (netProfit >= 40000) score += 44;
+  else if (netProfit >= 30000) score += 38;
+  else if (netProfit >= 25000) score += 30;
+  else if (netProfit >= 20000) score += 22;
+  else score += 10;
+
+  // Margin strength (0-30)
+  if (marginPercent >= 22) score += 30;
+  else if (marginPercent >= 18) score += 24;
+  else if (marginPercent >= 15) score += 16;
+  else if (marginPercent >= 12) score += 8;
+  else score += 0;
+
+  // MAO distance (0-20)
+  if (maoGapPct <= -10) score += 20;    // 10%+ below MAO
+  else if (maoGapPct <= 0) score += 15; // at or below MAO
+  else if (maoGapPct <= 5) score += 8;  // slightly above
+  else if (maoGapPct <= 10) score += 3; // moderately above
+  else score += 0;                       // far above MAO
+
+  return Math.min(95, Math.max(35, score));
+}
+
+function calcPassConfidence(netProfit: number, marginPercent: number): number {
+  // For PASS, high confidence = we are sure it's a bad deal
+  let score = 70;
+  if (netProfit < 0) score += 20;
+  else if (netProfit < 10000) score += 12;
+  if (marginPercent < 8) score += 10;
+  else if (marginPercent < 12) score += 5;
+  return Math.min(97, score);
 }

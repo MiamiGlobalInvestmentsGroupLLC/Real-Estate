@@ -57,7 +57,7 @@ export default function ResultsPanel({ results, aiDecision, redFlags, inputs, st
     );
   }
 
-  const isProfit = results.flipProfit >= 0;
+  const isProfit = results.netProfit >= 0;
   const scoreColor = results.dealScore >= 65 ? 'bg-emerald-500' : results.dealScore >= 40 ? 'bg-amber-500' : 'bg-red-500';
 
   function handleSave() {
@@ -178,17 +178,19 @@ export default function ResultsPanel({ results, aiDecision, redFlags, inputs, st
         <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Flip Profit</p>
+              <p className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-1">Net Profit</p>
               <p className={cn(
                 'text-4xl sm:text-5xl font-extrabold tabular-nums leading-none',
                 isProfit ? 'text-emerald-500' : 'text-red-500',
               )}>
-                {formatCurrency(results.flipProfit)}
+                {formatCurrency(results.netProfit)}
               </p>
               <p className="text-sm text-zinc-500 mt-1.5 font-medium">
                 {results.marginPercent >= 0 ? '+' : ''}{results.marginPercent.toFixed(1)}% margin
                 &nbsp;·&nbsp;
                 {results.roi.toFixed(1)}% ROI
+                &nbsp;·&nbsp;
+                {(results.sellingCostRate * 100).toFixed(0)}% selling costs included
               </p>
             </div>
             <div className="flex flex-col items-end gap-2 shrink-0">
@@ -230,13 +232,17 @@ export default function ResultsPanel({ results, aiDecision, redFlags, inputs, st
             <span className="text-zinc-500">After Repair Value (ARV)</span>
             <span className="font-semibold text-zinc-900 tabular-nums">{formatCurrency(inputs.arv)}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-zinc-500">− Selling Costs ({(results.sellingCostRate * 100).toFixed(0)}%)</span>
+            <span className="font-semibold text-red-600 tabular-nums">−{formatCurrency(results.sellingCosts)}</span>
+          </div>
           <div className="h-px bg-zinc-100 my-2" />
           <div className="flex justify-between font-extrabold">
             <span className={isProfit ? 'text-emerald-600' : 'text-red-600'}>
-              {strategy === 'wholesale' ? 'Assignment Fee' : strategy === 'rental' ? 'Profit (if flipped)' : 'Flip Profit'}
+              {strategy === 'wholesale' ? 'Assignment Fee' : strategy === 'rental' ? 'Net Profit (if flipped)' : 'Net Profit'}
             </span>
             <span className={cn('tabular-nums', isProfit ? 'text-emerald-600' : 'text-red-600')}>
-              {formatCurrency(strategy === 'wholesale' ? results.wholesaleAssignmentFee : results.flipProfit)}
+              {formatCurrency(strategy === 'wholesale' ? results.wholesaleAssignmentFee : results.netProfit)}
             </span>
           </div>
         </div>
@@ -269,21 +275,21 @@ export default function ResultsPanel({ results, aiDecision, redFlags, inputs, st
       {/* 5. Key metrics */}
       {strategy === 'wholesale' ? (
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="75% MAO" highlight />
           <MetricCard label="Assignment Fee" value={formatCurrency(results.wholesaleAssignmentFee)} subtext="MAO minus price" positive={results.wholesaleAssignmentFee > 0} negative={results.wholesaleAssignmentFee < 0} />
           <MetricCard label="Purchase Price" value={formatCurrency(inputs.purchasePrice)} subtext="Your cost basis" />
           <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />
         </div>
       ) : strategy === 'rental' ? (
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="75% MAO" highlight />
           <MetricCard label="Annual Cash Flow" value={results.rentalCashFlow !== null ? formatCurrency(results.rentalCashFlow * 12) : '—'} subtext="Monthly × 12" positive={(results.rentalCashFlow ?? 0) > 0} negative={(results.rentalCashFlow ?? 0) < 0} />
           <MetricCard label="Cap Rate" value={results.capRate !== null ? `${results.capRate.toFixed(1)}%` : '—'} subtext="NOI / purchase price" positive={(results.capRate ?? 0) >= 6} />
           <MetricCard label="Cash-on-Cash" value={results.cashOnCash !== null ? `${results.cashOnCash.toFixed(1)}%` : '—'} subtext="CF / down payment" positive={(results.cashOnCash ?? 0) >= 8} negative={(results.cashOnCash ?? 0) < 0} />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="70% Rule" highlight />
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="75% MAO" highlight />
           <MetricCard label="Total Investment" value={formatCurrency(results.totalInvestment)} subtext="All-in cost" />
           <MetricCard label="ROI" value={`${results.roi.toFixed(1)}%`} subtext="Return on investment" positive={results.roi >= 15} negative={results.roi < 0} />
           <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />

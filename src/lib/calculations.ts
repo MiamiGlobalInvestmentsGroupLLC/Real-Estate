@@ -5,37 +5,112 @@ export interface DealInputs {
   holdingCosts: number;
   closingCosts: number;
   monthlyRent?: number;
+  sellingCostRate?: number; // default 0.08 (8% of ARV)
 }
 
 export interface DealResults {
+  // Core profit (includes selling costs — the real net profit)
+  netProfit: number;
+  sellingCosts: number;
+  sellingCostRate: number;
+  totalInvestment: number;
+
+  // Legacy alias kept for display compatibility
+  flipProfit: number; // same as netProfit
+
+  // MAO
   maxAllowableOffer: number;
-  flipProfit: number;
+  maoRate: number; // the % used (0.75 default)
+
+  // Wholesale
   wholesaleAssignmentFee: number;
+
+  // Rates
+  marginPercent: number; // netProfit / ARV
+  roi: number;           // netProfit / totalInvestment
+  equityGained: number;  // ARV - purchasePrice
+
+  // Scoring
+  dealScore: number;
+  riskLevel: 'Low' | 'Medium' | 'High';
+  dealRating: 'Excellent' | 'Good' | 'Borderline' | 'Bad';
+
+  // Rental (if monthlyRent provided)
   rentalCashFlow: number | null;
   monthlyMortgage: number | null;
   capRate: number | null;
   cashOnCash: number | null;
-  roi: number;
-  dealScore: number;
-  riskLevel: 'Low' | 'Medium' | 'High';
-  dealRating: 'Excellent' | 'Good' | 'Borderline' | 'Bad';
-  marginPercent: number;
-  totalInvestment: number;
-  equityGained: number;
+
+  // Target offer to achieve 18% margin (for NEGOTIATE guidance)
+  targetOfferAt18: number;
+
+  // Flags
+  holdingCostWarning: boolean;
+}
+
+// Price target to achieve a specific margin % after selling costs
+export function targetOfferForMargin(
+  arv: number,
+  repairCosts: number,
+  holdingCosts: number,
+  closingCosts: number,
+  sellingCostRate: number,
+  targetMargin: number,
+): number {
+  // netProfit / ARV = targetMargin
+  // ARV - ARV*sellingRate - (offer + repair + holding + closing) = ARV * targetMargin
+  // offer = ARV*(1 - sellingRate - targetMargin) - repair - holding - closing
+  return arv * (1 - sellingCostRate - targetMargin) - repairCosts - holdingCosts - closingCosts;
 }
 
 export function calculateDeal(inputs: DealInputs): DealResults {
-  const { purchasePrice, arv, repairCosts, holdingCosts, closingCosts, monthlyRent } = inputs;
+  const {
+    purchasePrice,
+    arv,
+    repairCosts,
+    holdingCosts,
+    closingCosts,
+    monthlyRent,
+    sellingCostRate: customSellingRate,
+  } = inputs;
 
-  const maxAllowableOffer = arv * 0.7 - repairCosts;
+  // ── Selling costs (8% of ARV default) ──────────────────────────────────
+  const sellingCostRate = customSellingRate ?? 0.08;
+  const sellingCosts = arv * sellingCostRate;
+
+  // ── Total investment ────────────────────────────────────────────────────
   const totalInvestment = purchasePrice + repairCosts + holdingCosts + closingCosts;
-  const flipProfit = arv - totalInvestment;
-  const marginPercent = arv > 0 ? (flipProfit / arv) * 100 : 0;
-  const roi = totalInvestment > 0 ? (flipProfit / totalInvestment) * 100 : 0;
+
+  // ── Net profit (the real number — after selling costs) ──────────────────
+  const netProfit = arv - sellingCosts - totalInvestment;
+
+  // ── Margin on ARV ────────────────────────────────────────────────────────
+  const marginPercent = arv > 0 ? (netProfit / arv) * 100 : 0;
+
+  // ── ROI (secondary metric) ──────────────────────────────────────────────
+  const roi = totalInvestment > 0 ? (netProfit / totalInvestment) * 100 : 0;
+
+  // ── Equity ──────────────────────────────────────────────────────────────
   const equityGained = arv - purchasePrice;
 
-  const wholesaleAssignmentFee = maxAllowableOffer - purchasePrice;
+  // ── MAO (75% default per spec — traditional formula, subtract repair only)
+  // Range: 65–70% conservative, 70–75% standard, 75–80% strong
+  const maoRate = 0.75;
+  const maxAllowableOffer = arv * maoRate - repairCosts;
 
+  // ── Wholesale assignment (conservative — buyer at MAO) ───────────────────
+  const wholesaleAssignmentFee = Math.max(0, maxAllowableOffer - purchasePrice);
+
+  // ── Target offer to achieve 18% margin ──────────────────────────────────
+  const targetOfferAt18 = targetOfferForMargin(
+    arv, repairCosts, holdingCosts, closingCosts, sellingCostRate, 0.18,
+  );
+
+  // ── Holding cost realism warning ────────────────────────────────────────
+  // Typical holding: ~1% of property value/month × assumed 4 months = 4% of purchase price
+  const holdingCostWarning = holdingCosts > 0 && holdingCosts < purchasePrice * 0.02 && purchasePrice > 80000;
+
+  // ── Rental calculations ──────────────────────────────────────────────────
   let rentalCashFlow: number | null = null;
   let monthlyMortgage: number | null = null;
   let capRate: number | null = null;
@@ -48,7 +123,7 @@ export function calculateDeal(inputs: DealInputs): DealResults {
     monthlyMortgage =
       (loanAmount * (monthlyRate * Math.pow(1 + monthlyRate, n))) /
       (Math.pow(1 + monthlyRate, n) - 1);
-    const monthlyExpenses = monthlyRent * 0.15;
+    const monthlyExpenses = monthlyRent * 0.15; // vacancy + maintenance
     rentalCashFlow = monthlyRent - monthlyMortgage - monthlyExpenses;
 
     const annualNOI = monthlyRent * 12 * 0.85;
@@ -58,55 +133,59 @@ export function calculateDeal(inputs: DealInputs): DealResults {
     cashOnCash = downPayment > 0 ? ((rentalCashFlow * 12) / downPayment) * 100 : null;
   }
 
-  // Deal Score (0–100)
+  // ── Deal Score (0–100) ───────────────────────────────────────────────────
+  // Priority: 1) Net Profit (35pts), 2) Margin (30pts), 3) Price vs MAO (25pts), 4) Rehab (10pts)
   let score = 0;
 
-  // Margin contribution (40 pts)
-  if (marginPercent >= 25) score += 40;
-  else if (marginPercent >= 20) score += 32;
-  else if (marginPercent >= 15) score += 24;
-  else if (marginPercent >= 10) score += 16;
-  else if (marginPercent >= 5) score += 8;
+  // Net Profit tier (35 pts)
+  if (netProfit >= 40000) score += 35;
+  else if (netProfit >= 30000) score += 28;
+  else if (netProfit >= 25000) score += 21;
+  else if (netProfit >= 20000) score += 14;
+  else if (netProfit >= 15000) score += 7;
 
-  // Purchase vs MAO (30 pts)
+  // Margin tier (30 pts)
+  if (marginPercent >= 20) score += 30;
+  else if (marginPercent >= 18) score += 25;
+  else if (marginPercent >= 15) score += 20;
+  else if (marginPercent >= 12) score += 14;
+  else if (marginPercent >= 8) score += 7;
+
+  // Price vs MAO (25 pts)
   if (maxAllowableOffer > 0) {
-    if (purchasePrice <= maxAllowableOffer) {
-      const pctBelow = ((maxAllowableOffer - purchasePrice) / maxAllowableOffer) * 100;
-      if (pctBelow >= 10) score += 30;
-      else if (pctBelow >= 5) score += 22;
-      else score += 14;
-    } else {
-      const pctAbove = ((purchasePrice - maxAllowableOffer) / maxAllowableOffer) * 100;
-      if (pctAbove < 5) score += 5;
-    }
+    const pctAboveMao = ((purchasePrice - maxAllowableOffer) / maxAllowableOffer) * 100;
+    if (pctAboveMao <= -10) score += 25;       // ≥10% below MAO
+    else if (pctAboveMao <= 0) score += 18;    // at or below MAO
+    else if (pctAboveMao <= 5) score += 10;    // up to 5% above
+    else if (pctAboveMao <= 10) score += 4;    // up to 10% above
+    // >10% above MAO → 0 pts
   }
 
-  // ROI contribution (20 pts)
-  if (roi >= 25) score += 20;
-  else if (roi >= 20) score += 16;
-  else if (roi >= 15) score += 12;
-  else if (roi >= 10) score += 8;
-  else if (roi >= 5) score += 4;
-
-  // Repair ratio (10 pts)
+  // Rehab ratio (10 pts)
   const repairRatio = arv > 0 ? repairCosts / arv : 1;
-  if (repairRatio < 0.1) score += 10;
+  if (repairRatio < 0.10) score += 10;
   else if (repairRatio < 0.15) score += 8;
-  else if (repairRatio < 0.2) score += 6;
+  else if (repairRatio < 0.20) score += 6;
   else if (repairRatio < 0.25) score += 4;
-  else if (repairRatio < 0.3) score += 2;
+  else if (repairRatio < 0.30) score += 2;
 
   score = Math.min(100, Math.max(0, Math.round(score)));
 
+  // ── Risk Level ───────────────────────────────────────────────────────────
+  const pctAboveMaoForRisk = maxAllowableOffer > 0
+    ? ((purchasePrice - maxAllowableOffer) / maxAllowableOffer) * 100
+    : 100;
+
   let riskLevel: 'Low' | 'Medium' | 'High';
-  if (marginPercent >= 20 && repairRatio < 0.15 && purchasePrice <= maxAllowableOffer) {
+  if (marginPercent >= 18 && netProfit >= 30000 && pctAboveMaoForRisk <= 0 && repairRatio < 0.15) {
     riskLevel = 'Low';
-  } else if (marginPercent >= 10 && repairRatio < 0.25) {
+  } else if (marginPercent >= 12 && netProfit >= 20000 && pctAboveMaoForRisk <= 10 && repairRatio < 0.25) {
     riskLevel = 'Medium';
   } else {
     riskLevel = 'High';
   }
 
+  // ── Deal Rating ──────────────────────────────────────────────────────────
   let dealRating: 'Excellent' | 'Good' | 'Borderline' | 'Bad';
   if (score >= 75) dealRating = 'Excellent';
   else if (score >= 55) dealRating = 'Good';
@@ -114,20 +193,26 @@ export function calculateDeal(inputs: DealInputs): DealResults {
   else dealRating = 'Bad';
 
   return {
+    netProfit,
+    flipProfit: netProfit, // alias
+    sellingCosts,
+    sellingCostRate,
+    totalInvestment,
     maxAllowableOffer,
-    flipProfit,
+    maoRate,
     wholesaleAssignmentFee,
+    marginPercent,
+    roi,
+    equityGained,
+    dealScore: score,
+    riskLevel,
+    dealRating,
     rentalCashFlow,
     monthlyMortgage,
     capRate,
     cashOnCash,
-    roi,
-    dealScore: score,
-    riskLevel,
-    dealRating,
-    marginPercent,
-    totalInvestment,
-    equityGained,
+    targetOfferAt18: Math.max(0, Math.round(targetOfferAt18 / 500) * 500),
+    holdingCostWarning,
   };
 }
 

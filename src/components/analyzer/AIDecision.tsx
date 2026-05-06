@@ -51,37 +51,41 @@ const strategyColors: Record<string, string> = {
 };
 
 function getEducationBullets(decision: AIDecisionResult, results: DealResults): string[] {
-  const { dealScore, marginPercent, roi, maxAllowableOffer } = results;
+  const { netProfit, dealScore, marginPercent, roi, maxAllowableOffer } = results;
   const { decision: dec } = decision;
   const bullets: string[] = [];
 
   if (dec === 'BUY') {
-    bullets.push(`Score ${dealScore}/100 — above the 65-point buy threshold`);
-    bullets.push(`${marginPercent.toFixed(1)}% margin — meets the 15% minimum for a safe flip`);
-    if (roi >= 20) bullets.push(`${roi.toFixed(1)}% ROI — exceptional return on investment`);
+    bullets.push(`Net profit $${Math.round(netProfit / 1000)}k — meets the $30K+ buy threshold`);
+    bullets.push(`${marginPercent.toFixed(1)}% margin — at or above the 18% target for a safe flip`);
+    if (roi >= 20) bullets.push(`${roi.toFixed(1)}% ROI — exceptional return on total investment`);
     else bullets.push(`${roi.toFixed(1)}% ROI — solid return on your total investment`);
-    bullets.push(`Price is at or under your Max Allowable Offer (MAO) — room to profit`);
+    if (maxAllowableOffer > 0 && decision.suggestedOffer <= maxAllowableOffer) {
+      bullets.push(`Price is at or under Max Allowable Offer (MAO) — you have room to profit`);
+    } else {
+      bullets.push(`Strong profit and margin justify moving forward`);
+    }
   } else if (dec === 'NEGOTIATE') {
-    bullets.push(`Score ${dealScore}/100 — potential exists but numbers need improvement`);
-    bullets.push(`${marginPercent.toFixed(1)}% margin — ideally you want 15%+ for a safe buffer`);
+    bullets.push(`Net profit $${Math.round(netProfit / 1000)}k — potential exists, but price needs improvement`);
+    bullets.push(`${marginPercent.toFixed(1)}% margin — target is 18%+ for a comfortable buffer`);
     if (maxAllowableOffer > 0) {
       const gap = decision.suggestedOffer - maxAllowableOffer;
       if (gap < 0) {
-        bullets.push(`Suggested offer targets MAO — pushes price into profitable range`);
+        bullets.push(`Suggested offer is below MAO — gets you to target margin if accepted`);
       } else {
-        bullets.push(`Lowering price by $${Math.abs(Math.round(gap / 1000))}k would hit your MAO target`);
+        bullets.push(`Ask for a $${Math.abs(Math.round(gap / 1000))}k reduction to reach your profit target`);
       }
     }
-    bullets.push(`Profit exists but thin — one cost overrun could erase the margin`);
+    bullets.push(`One cost overrun at this margin could erase your profit — negotiate first`);
   } else {
-    if (results.flipProfit < 0) {
-      bullets.push(`Negative profit — this deal loses money at current numbers`);
+    if (netProfit < 0) {
+      bullets.push(`Negative net profit — this deal loses money after all costs and selling fees`);
     } else {
-      bullets.push(`Score ${dealScore}/100 — below the minimum acceptable range`);
+      bullets.push(`Net profit $${Math.round(netProfit / 1000)}k — below the $20K minimum threshold`);
     }
-    bullets.push(`${marginPercent.toFixed(1)}% margin — not enough buffer for cost overruns`);
-    bullets.push(`Even with negotiation, numbers don't support a profitable exit`);
-    bullets.push(`Better capital allocation exists — wait for a better deal`);
+    bullets.push(`${marginPercent.toFixed(1)}% margin — not enough buffer for contractor overruns or delays`);
+    bullets.push(`Even with negotiation, numbers are unlikely to reach a profitable exit`);
+    bullets.push(`Better deals exist — preserve capital and wait for stronger numbers`);
   }
 
   return bullets;

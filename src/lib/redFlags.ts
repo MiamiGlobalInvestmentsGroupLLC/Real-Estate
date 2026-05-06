@@ -9,31 +9,31 @@ export interface RedFlag {
 
 export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFlag[] {
   const { purchasePrice, arv, repairCosts, holdingCosts, closingCosts } = inputs;
-  const { maxAllowableOffer, flipProfit, marginPercent, roi } = results;
+  const { maxAllowableOffer, netProfit, marginPercent, roi, holdingCostWarning } = results;
 
   const flags: RedFlag[] = [];
   const repairRatio = arv > 0 ? repairCosts / arv : 0;
 
-  if (flipProfit < 0) {
+  if (netProfit < 0) {
     flags.push({
       id: 'negative-profit',
       severity: 'critical',
-      title: 'Negative Profit',
-      description: `This deal loses $${Math.abs(Math.round(flipProfit / 1000))}k at current price. Do not buy.`,
+      title: 'Negative Net Profit',
+      description: `This deal loses ${fmtK(Math.abs(netProfit))} after all costs including selling fees. Do not buy.`,
     });
   }
 
-  if (purchasePrice > maxAllowableOffer * 1.05) {
+  if (purchasePrice > maxAllowableOffer * 1.05 && maxAllowableOffer > 0) {
     const overK = Math.round((purchasePrice - maxAllowableOffer) / 1000);
     flags.push({
       id: 'over-mao',
       severity: 'critical',
       title: 'Above Max Allowable Offer',
-      description: `Asking price exceeds MAO by $${overK}k. Fails the 70% rule — margin is unsustainable.`,
+      description: `Asking price exceeds MAO by $${overK}k. Based on the 75% rule — margin is unsustainable at this price.`,
     });
   }
 
-  if (marginPercent >= 0 && marginPercent < 10) {
+  if (marginPercent >= 0 && marginPercent < 12) {
     flags.push({
       id: 'low-margin',
       severity: 'critical',
@@ -51,12 +51,12 @@ export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFla
     });
   }
 
-  if (marginPercent >= 10 && marginPercent < 15) {
+  if (marginPercent >= 12 && marginPercent < 18) {
     flags.push({
       id: 'tight-margin',
       severity: 'warning',
       title: 'Tight Profit Margin',
-      description: `${marginPercent.toFixed(1)}% margin works but leaves little room for surprises. Minimum recommended: 15%.`,
+      description: `${marginPercent.toFixed(1)}% margin works but leaves little room for surprises. Target is 18%+.`,
     });
   }
 
@@ -69,12 +69,12 @@ export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFla
     });
   }
 
-  if (holdingCosts < arv * 0.01 && arv > 80000 && holdingCosts > 0) {
+  if (holdingCostWarning) {
     flags.push({
       id: 'low-holding',
       severity: 'warning',
-      title: 'Holding Costs May Be Low',
-      description: `Include taxes, insurance, utilities, and loan interest. Typical holding costs: 1–3% of ARV per 6 months.`,
+      title: 'Holding Costs May Be Underestimated',
+      description: `Typical holding costs are ~1% of purchase price per month (taxes, insurance, utilities, financing). Verify your estimate.`,
     });
   }
 
@@ -87,12 +87,12 @@ export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFla
     });
   }
 
-  if (roi >= 0 && roi < 12) {
+  if (roi >= 0 && roi < 15) {
     flags.push({
       id: 'low-roi',
       severity: 'warning',
       title: 'Below-Target ROI',
-      description: `${roi.toFixed(1)}% ROI is below the 15% minimum most flippers target. Consider other deals.`,
+      description: `${roi.toFixed(1)}% ROI is below the 15% minimum most investors target. Consider the opportunity cost.`,
     });
   }
 
@@ -107,4 +107,8 @@ export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFla
   }
 
   return flags;
+}
+
+function fmtK(value: number): string {
+  return `$${Math.round(value / 1000)}k`;
 }

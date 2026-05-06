@@ -10,7 +10,7 @@ interface DealFormProps {
   initialValues?: Partial<DealInputs>;
 }
 
-type FieldKey = keyof DealInputs;
+type FieldKey = keyof Omit<DealInputs, 'sellingCostRate'>;
 
 const fields: { key: FieldKey; label: string; placeholder: string; required: boolean; hint?: string }[] = [
   { key: 'purchasePrice', label: 'Purchase Price', placeholder: '180,000', required: true, hint: 'Seller asking price' },
