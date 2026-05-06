@@ -26,7 +26,7 @@ export default function SMSAnalyzer({ onParsed }: SMSAnalyzerProps) {
     setTimeout(() => {
       const result = parseSMSText(input);
       setParsed(result);
-      if (result.confidence >= 33) {
+      if (result.confidence >= 60) {
         onParsed(result);
       }
       setLoading(false);
@@ -104,8 +104,8 @@ export default function SMSAnalyzer({ onParsed }: SMSAnalyzerProps) {
       {parsed && (
         <div className={cn(
           'rounded-2xl border p-5 animate-fadeIn',
-          parsed.confidence >= 66 ? 'bg-emerald-50 border-emerald-200' :
-          parsed.confidence >= 33 ? 'bg-amber-50 border-amber-200' :
+          parsed.confidence >= 90 ? 'bg-emerald-50 border-emerald-200' :
+          parsed.confidence >= 60 ? 'bg-amber-50 border-amber-200' :
           'bg-red-50 border-red-200',
         )}>
           <div className="flex items-center justify-between mb-4">
@@ -113,8 +113,8 @@ export default function SMSAnalyzer({ onParsed }: SMSAnalyzerProps) {
             <div className="flex items-center gap-1.5">
               <div className={cn(
                 'w-2 h-2 rounded-full',
-                parsed.confidence >= 66 ? 'bg-emerald-500' :
-                parsed.confidence >= 33 ? 'bg-amber-500' : 'bg-red-500',
+                parsed.confidence >= 90 ? 'bg-emerald-500' :
+                parsed.confidence >= 60 ? 'bg-amber-500' : 'bg-red-500',
               )} />
               <span className="text-xs font-semibold text-zinc-600">{parsed.confidence}% confidence</span>
             </div>
@@ -148,13 +148,43 @@ export default function SMSAnalyzer({ onParsed }: SMSAnalyzerProps) {
             </p>
           )}
 
-          {parsed.confidence >= 33 && (
-            <p className="text-xs text-zinc-500 mt-3">
+          {/* Errors (critical) */}
+          {parsed.errors && parsed.errors.length > 0 && (
+            <div className="mt-3 space-y-1.5">
+              {parsed.errors.map((err, i) => (
+                <div key={i} className="flex items-start gap-2 bg-red-100 border border-red-300 rounded-lg px-3 py-2">
+                  <span className="text-red-600 text-xs font-bold mt-0.5 shrink-0">✕</span>
+                  <p className="text-xs text-red-700 font-medium">{err}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Warnings */}
+          {parsed.warnings && parsed.warnings.length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              {parsed.warnings.map((w, i) => (
+                <div key={i} className="flex items-start gap-2 bg-amber-100 border border-amber-300 rounded-lg px-3 py-2">
+                  <span className="text-amber-600 text-xs font-bold mt-0.5 shrink-0">⚠</span>
+                  <p className="text-xs text-amber-800">{w}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {parsed.confidence < 90 && parsed.confidence >= 60 && (
+            <p className="text-xs text-amber-600 mt-3 font-medium">
+              ⚠ Confidence below 90% — verify extracted values before relying on results.
+            </p>
+          )}
+
+          {parsed.confidence >= 60 && (
+            <p className="text-xs text-zinc-500 mt-2">
               ✓ Analysis updated in the Deal Analyzer above
             </p>
           )}
 
-          {parsed.confidence < 33 && (
+          {parsed.confidence < 60 && (
             <p className="text-xs text-red-500 mt-3">
               Could not extract enough data. Try including ARV, repair costs, and asking price.
             </p>
