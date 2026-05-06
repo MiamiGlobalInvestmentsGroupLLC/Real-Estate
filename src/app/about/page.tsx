@@ -62,7 +62,7 @@ export default function AboutPage() {
                 },
                 {
                   title: 'Offer Generator',
-                  desc: 'Generate professional seller SMS messages and PDF offer letters with your branding in seconds.',
+                  desc: 'Generate professional seller SMS messages with your branding in seconds.',
                   icon: '📄',
                 },
                 {

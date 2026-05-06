@@ -223,7 +223,7 @@ export default function AnalyzerPage() {
                     <svg className="w-7 h-7 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                   </div>
                   <h3 className="text-lg font-extrabold text-zinc-900 mb-2">Pro Feature</h3>
-                  <p className="text-sm text-zinc-500 mb-6">The Offer Generator is available on Pro and Investor plans. Upgrade to generate professional seller SMS and PDF offer letters.</p>
+                  <p className="text-sm text-zinc-500 mb-6">The Offer Message feature is available on Pro and Investor plans. Upgrade to generate professional seller messages instantly.</p>
                   <a href="/pricing" className="inline-block bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-3 rounded-xl text-sm transition-colors">
                     Upgrade to Pro — $9/mo →
                   </a>

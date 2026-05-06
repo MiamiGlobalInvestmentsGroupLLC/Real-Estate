@@ -47,7 +47,7 @@ const features = [
   {
     title: 'Instant Offer Generator',
     description:
-      'Generate a professional offer letter or seller SMS in one click. Ready to send, ready to print — no formatting required.',
+      'Generate a professional seller SMS in one click. Ready to copy and send — no formatting required.',
     badge: '📄 Offers',
     badgeColor: 'bg-purple-100 text-purple-700',
     metric: '1-click',

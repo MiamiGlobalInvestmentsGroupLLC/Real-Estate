@@ -27,7 +27,7 @@ const steps = [
     number: '03',
     title: 'Make Your Move',
     description:
-      'Generate a professional offer letter or seller SMS in one click. Know your max offer, ROI, and deal score — then act with confidence.',
+      'Generate a professional seller SMS in one click. Know your max offer, ROI, and deal score — then act with confidence.',
     color: 'bg-cyan-50 border-cyan-200 text-cyan-600',
     icon: (
       <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

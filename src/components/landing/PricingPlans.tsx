@@ -38,7 +38,7 @@ const plans = [
       'Unlimited deal analyses',
       'Full AI decision engine',
       'SMS Deal Engine',
-      'Offer generator (PDF + SMS)',
+      'Offer message generator (SMS)',
       'Red flag auto-detection',
       'Save & track deals',
       'Multi-strategy analysis',
