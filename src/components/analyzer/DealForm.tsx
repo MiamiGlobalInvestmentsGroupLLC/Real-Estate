@@ -11,14 +11,16 @@ interface DealFormProps {
 }
 
 type FieldKey = keyof Omit<DealInputs, 'sellingCostRate'>;
+type FieldMeta = { key: FieldKey; label: string; placeholder: string; required: boolean; hint?: string; unit?: 'currency' | 'months' };
 
-const fields: { key: FieldKey; label: string; placeholder: string; required: boolean; hint?: string }[] = [
-  { key: 'purchasePrice', label: 'Purchase Price', placeholder: '180,000', required: true, hint: 'Seller asking price' },
-  { key: 'arv', label: 'After Repair Value (ARV)', placeholder: '250,000', required: true, hint: 'Value after repairs' },
-  { key: 'repairCosts', label: 'Repair / Rehab Costs', placeholder: '40,000', required: true, hint: 'Total estimated repairs' },
-  { key: 'holdingCosts', label: 'Holding Costs', placeholder: '5,000', required: false, hint: 'Taxes, insurance, utilities' },
-  { key: 'closingCosts', label: 'Closing Costs', placeholder: '5,000', required: false, hint: 'Buy & sell closing fees' },
-  { key: 'monthlyRent', label: 'Monthly Rent', placeholder: '2,000', required: false, hint: 'Optional — rental analysis' },
+const fields: FieldMeta[] = [
+  { key: 'purchasePrice', label: 'Purchase Price', placeholder: '180,000', required: true, hint: 'Seller asking price', unit: 'currency' },
+  { key: 'arv', label: 'After Repair Value (ARV)', placeholder: '250,000', required: true, hint: 'Value after repairs', unit: 'currency' },
+  { key: 'repairCosts', label: 'Repair / Rehab Costs', placeholder: '40,000', required: true, hint: 'Total estimated repairs', unit: 'currency' },
+  { key: 'holdingCosts', label: 'Holding Costs', placeholder: '5,000', required: false, hint: 'Taxes, insurance, utilities', unit: 'currency' },
+  { key: 'holdingMonths', label: 'Holding Period', placeholder: '4', required: false, hint: 'Months — defaults to 4', unit: 'months' },
+  { key: 'closingCosts', label: 'Closing Costs', placeholder: '5,000', required: false, hint: 'Buy & sell closing fees', unit: 'currency' },
+  { key: 'monthlyRent', label: 'Monthly Rent', placeholder: '2,000', required: false, hint: 'Optional — rental analysis', unit: 'currency' },
 ];
 
 function parseInput(value: string): number {
@@ -33,6 +35,7 @@ function buildInputs(values: FormValues): DealInputs {
     arv: parseInput(values.arv),
     repairCosts: parseInput(values.repairCosts),
     holdingCosts: parseInput(values.holdingCosts),
+    holdingMonths: values.holdingMonths ? parseInput(values.holdingMonths) : undefined,
     closingCosts: parseInput(values.closingCosts),
     monthlyRent: values.monthlyRent ? parseInput(values.monthlyRent) : undefined,
   };
@@ -44,6 +47,7 @@ export default function DealForm({ onCalculate, initialValues }: DealFormProps) 
     arv: initialValues?.arv?.toString() ?? '',
     repairCosts: initialValues?.repairCosts?.toString() ?? '',
     holdingCosts: initialValues?.holdingCosts?.toString() ?? '',
+    holdingMonths: initialValues?.holdingMonths?.toString() ?? '',
     closingCosts: initialValues?.closingCosts?.toString() ?? '',
     monthlyRent: initialValues?.monthlyRent?.toString() ?? '',
   });
@@ -82,7 +86,7 @@ export default function DealForm({ onCalculate, initialValues }: DealFormProps) 
           <p className="text-sm text-zinc-500 mt-0.5">Results update instantly as you type</p>
         </div>
         {hasValues && (
-          <button onClick={() => setValues({ purchasePrice: '', arv: '', repairCosts: '', holdingCosts: '', closingCosts: '', monthlyRent: '' })}
+          <button onClick={() => setValues({ purchasePrice: '', arv: '', repairCosts: '', holdingCosts: '', holdingMonths: '', closingCosts: '', monthlyRent: '' })}
             className="text-xs text-zinc-400 hover:text-zinc-600 font-medium transition-colors">
             Clear
           </button>
@@ -100,7 +104,9 @@ export default function DealForm({ onCalculate, initialValues }: DealFormProps) 
               {field.hint && <span className="text-xs text-zinc-400">{field.hint}</span>}
             </div>
             <div className="relative">
-              <span className="absolute inset-y-0 left-3.5 flex items-center text-zinc-400 font-semibold text-sm pointer-events-none">$</span>
+              {field.unit !== 'months' && (
+                <span className="absolute inset-y-0 left-3.5 flex items-center text-zinc-400 font-semibold text-sm pointer-events-none">$</span>
+              )}
               <input
                 type="text"
                 inputMode="numeric"
@@ -108,11 +114,16 @@ export default function DealForm({ onCalculate, initialValues }: DealFormProps) 
                 onChange={(e) => handleChange(field.key, e.target.value)}
                 placeholder={field.placeholder}
                 className={cn(
-                  'w-full pl-8 pr-4 py-3 bg-white border rounded-xl text-sm font-semibold text-zinc-900 placeholder-zinc-300',
+                  'w-full py-3 bg-white border rounded-xl text-sm font-semibold text-zinc-900 placeholder-zinc-300',
                   'focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-150',
+                  field.unit !== 'months' ? 'pl-8' : 'pl-4',
+                  field.unit === 'months' ? 'pr-10' : 'pr-4',
                   values[field.key] ? 'border-zinc-300' : 'border-zinc-200',
                 )}
               />
+              {field.unit === 'months' && (
+                <span className="absolute inset-y-0 right-3.5 flex items-center text-zinc-400 text-xs font-medium pointer-events-none">mo</span>
+              )}
             </div>
           </div>
         ))}
@@ -134,7 +145,7 @@ export default function DealForm({ onCalculate, initialValues }: DealFormProps) 
         <p className="text-xs font-semibold text-zinc-500 mb-2">Try a quick example</p>
         <button
           onClick={() => {
-            const ex: FormValues = { purchasePrice: '180000', arv: '250000', repairCosts: '40000', holdingCosts: '5000', closingCosts: '6000', monthlyRent: '2000' };
+            const ex: FormValues = { purchasePrice: '180000', arv: '250000', repairCosts: '40000', holdingCosts: '5000', holdingMonths: '4', closingCosts: '6000', monthlyRent: '2000' };
             setValues(ex);
             onCalculate(buildInputs(ex));
           }}

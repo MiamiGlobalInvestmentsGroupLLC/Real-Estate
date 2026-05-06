@@ -8,8 +8,9 @@ export interface RedFlag {
 }
 
 export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFlag[] {
-  const { purchasePrice, arv, repairCosts, holdingCosts, closingCosts } = inputs;
+  const { purchasePrice, arv, repairCosts, holdingCosts, closingCosts, holdingMonths } = inputs;
   const { maxAllowableOffer, netProfit, marginPercent, roi, holdingCostWarning } = results;
+  const effectiveMonths = holdingMonths ?? 4;
 
   const flags: RedFlag[] = [];
   const repairRatio = arv > 0 ? repairCosts / arv : 0;
@@ -74,7 +75,16 @@ export function detectRedFlags(inputs: DealInputs, results: DealResults): RedFla
       id: 'low-holding',
       severity: 'warning',
       title: 'Holding Costs May Be Underestimated',
-      description: `Typical holding costs are ~1% of purchase price per month (taxes, insurance, utilities, financing). Verify your estimate.`,
+      description: `Typical holding costs are ~1% of purchase price per month (taxes, insurance, utilities, financing). For ${effectiveMonths} months, expect ~${fmtK(purchasePrice * 0.01 * effectiveMonths)}.`,
+    });
+  }
+
+  if (effectiveMonths > 6) {
+    flags.push({
+      id: 'long-hold',
+      severity: 'warning',
+      title: 'Extended Holding Period',
+      description: `${effectiveMonths}-month hold increases financing costs, property taxes, and market exposure. Ensure your margin accounts for the extended timeline.`,
     });
   }
 

@@ -275,21 +275,21 @@ export default function ResultsPanel({ results, aiDecision, redFlags, inputs, st
       {/* 5. Key metrics */}
       {strategy === 'wholesale' ? (
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="75% MAO" highlight />
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext={`${(results.maoRate * 100).toFixed(0)}% MAO`} highlight />
           <MetricCard label="Assignment Fee" value={formatCurrency(results.wholesaleAssignmentFee)} subtext="MAO minus price" positive={results.wholesaleAssignmentFee > 0} negative={results.wholesaleAssignmentFee < 0} />
           <MetricCard label="Purchase Price" value={formatCurrency(inputs.purchasePrice)} subtext="Your cost basis" />
           <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />
         </div>
       ) : strategy === 'rental' ? (
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="75% MAO" highlight />
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext={`${(results.maoRate * 100).toFixed(0)}% MAO`} highlight />
           <MetricCard label="Annual Cash Flow" value={results.rentalCashFlow !== null ? formatCurrency(results.rentalCashFlow * 12) : '—'} subtext="Monthly × 12" positive={(results.rentalCashFlow ?? 0) > 0} negative={(results.rentalCashFlow ?? 0) < 0} />
           <MetricCard label="Cap Rate" value={results.capRate !== null ? `${results.capRate.toFixed(1)}%` : '—'} subtext="NOI / purchase price" positive={(results.capRate ?? 0) >= 6} />
           <MetricCard label="Cash-on-Cash" value={results.cashOnCash !== null ? `${results.cashOnCash.toFixed(1)}%` : '—'} subtext="CF / down payment" positive={(results.cashOnCash ?? 0) >= 8} negative={(results.cashOnCash ?? 0) < 0} />
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
-          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext="75% MAO" highlight />
+          <MetricCard label="Max Allowable Offer" value={formatCurrency(results.maxAllowableOffer)} subtext={`${(results.maoRate * 100).toFixed(0)}% MAO`} highlight />
           <MetricCard label="Total Investment" value={formatCurrency(results.totalInvestment)} subtext="All-in cost" />
           <MetricCard label="ROI" value={`${results.roi.toFixed(1)}%`} subtext="Return on investment" positive={results.roi >= 15} negative={results.roi < 0} />
           <MetricCard label="Equity Gained" value={formatCurrency(results.equityGained)} subtext="ARV minus purchase" positive={results.equityGained > 0} negative={results.equityGained < 0} />

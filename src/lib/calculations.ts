@@ -5,6 +5,7 @@ export interface DealInputs {
   holdingCosts: number;
   closingCosts: number;
   monthlyRent?: number;
+  holdingMonths?: number;   // default 4 if omitted
   sellingCostRate?: number; // default 0.08 (8% of ARV)
 }
 
@@ -71,6 +72,7 @@ export function calculateDeal(inputs: DealInputs): DealResults {
     holdingCosts,
     closingCosts,
     monthlyRent,
+    holdingMonths,
     sellingCostRate: customSellingRate,
   } = inputs;
 
@@ -93,9 +95,17 @@ export function calculateDeal(inputs: DealInputs): DealResults {
   // ── Equity ──────────────────────────────────────────────────────────────
   const equityGained = arv - purchasePrice;
 
-  // ── MAO (75% default per spec — traditional formula, subtract repair only)
-  // Range: 65–70% conservative, 70–75% standard, 75–80% strong
-  const maoRate = 0.75;
+  // ── Dynamic MAO rate (section 25) ───────────────────────────────────────
+  // Margin is already known (doesn't depend on MAO) — no circularity.
+  // Strong deal → allow 75–80% | Acceptable → 70–75% | Weak → 65–70%
+  let maoRate: number;
+  if (marginPercent >= 18 && netProfit >= 30000) {
+    maoRate = 0.78; // strong
+  } else if (marginPercent >= 14) {
+    maoRate = 0.73; // acceptable
+  } else {
+    maoRate = 0.68; // weak / risky
+  }
   const maxAllowableOffer = arv * maoRate - repairCosts;
 
   // ── Wholesale assignment (conservative — buyer at MAO) ───────────────────
@@ -106,9 +116,13 @@ export function calculateDeal(inputs: DealInputs): DealResults {
     arv, repairCosts, holdingCosts, closingCosts, sellingCostRate, 0.18,
   );
 
-  // ── Holding cost realism warning ────────────────────────────────────────
-  // Typical holding: ~1% of property value/month × assumed 4 months = 4% of purchase price
-  const holdingCostWarning = holdingCosts > 0 && holdingCosts < purchasePrice * 0.02 && purchasePrice > 80000;
+  // ── Effective holding months (section 16) ───────────────────────────────
+  const effectiveMonths = holdingMonths ?? 4;
+
+  // ── Holding cost realism warning (section 20) ────────────────────────────
+  // Typical: ~1%/month of purchase price. Warn if actual is under 50% of expected.
+  const minExpectedHolding = purchasePrice * 0.005 * effectiveMonths;
+  const holdingCostWarning = holdingCosts > 0 && holdingCosts < minExpectedHolding && purchasePrice > 80000;
 
   // ── Rental calculations ──────────────────────────────────────────────────
   let rentalCashFlow: number | null = null;
@@ -183,6 +197,17 @@ export function calculateDeal(inputs: DealInputs): DealResults {
     riskLevel = 'Medium';
   } else {
     riskLevel = 'High';
+  }
+
+  // ── Holding time adjustment (section 16) ────────────────────────────────
+  // > 6 months → market risk increases → downgrade one level
+  // < 3 months → faster exit → upgrade one level if margin supports it
+  if (effectiveMonths > 6) {
+    if (riskLevel === 'Low') riskLevel = 'Medium';
+    else if (riskLevel === 'Medium') riskLevel = 'High';
+  } else if (effectiveMonths < 3) {
+    if (riskLevel === 'Medium' && marginPercent >= 18) riskLevel = 'Low';
+    else if (riskLevel === 'High' && marginPercent >= 15 && netProfit >= 25000) riskLevel = 'Medium';
   }
 
   // ── Deal Rating ──────────────────────────────────────────────────────────
