@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { AppProvider } from '@/context/AppContext';
+import UpgradeModal from '@/components/ui/UpgradeModal';
+import StickyUpgradeCTA from '@/components/ui/StickyUpgradeCTA';
 
 export const metadata: Metadata = {
   title: 'DealEdge AI — Know in 30 seconds if your deal is worth it',
@@ -24,7 +27,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <AppProvider>
+          {children}
+          <UpgradeModal />
+          <StickyUpgradeCTA />
+        </AppProvider>
+      </body>
     </html>
   );
 }
