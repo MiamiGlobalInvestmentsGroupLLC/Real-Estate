@@ -6,7 +6,8 @@ import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { useApp } from '@/context/AppContext';
 import { cn } from '@/lib/utils';
-import { EARLY_ACCESS, STRIPE_PRO_LINK, STRIPE_INVESTOR_LINK } from '@/lib/config';
+import { EARLY_ACCESS } from '@/lib/config';
+import UpgradeButton from '@/components/ui/UpgradeButton';
 
 const planColors: Record<string, string> = {
   free: 'bg-zinc-100 text-zinc-700 border-zinc-200',
@@ -166,22 +167,18 @@ export default function DashboardPage() {
               <p className="font-extrabold text-lg mb-1">Upgrade to Pro</p>
               <p className="text-indigo-100 text-sm mb-4">Unlock unlimited analyses, AI decisions, and offer generation.</p>
               <div className="flex flex-col sm:flex-row gap-3">
-                <a
-                  href={STRIPE_PRO_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <UpgradeButton
+                  plan="pro"
                   className="flex-1 text-center bg-white text-indigo-700 hover:bg-indigo-50 font-bold py-2.5 rounded-xl text-sm transition-colors"
                 >
                   Pro — $9/month
-                </a>
-                <a
-                  href={STRIPE_INVESTOR_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                </UpgradeButton>
+                <UpgradeButton
+                  plan="investor"
                   className="flex-1 text-center bg-white/20 hover:bg-white/30 text-white font-bold py-2.5 rounded-xl text-sm transition-colors border border-white/30"
                 >
                   Investor — $19/month
-                </a>
+                </UpgradeButton>
               </div>
             </div>
           )}

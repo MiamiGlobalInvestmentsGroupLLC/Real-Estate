@@ -3,13 +3,7 @@
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { EARLY_ACCESS } from '@/lib/config';
-
-// Set these to your Stripe Payment Link URLs.
-// In your Stripe Dashboard, configure the success URL for each payment link to:
-//   https://your-domain.com/upgrade/success?session_id={CHECKOUT_SESSION_ID}&plan=pro
-//   https://your-domain.com/upgrade/success?session_id={CHECKOUT_SESSION_ID}&plan=investor
-const STRIPE_PRO_LINK = 'https://buy.stripe.com/bJe7sL9XJaVg89884JbfO08';
-const STRIPE_INVESTOR_LINK = 'https://buy.stripe.com/bJe14nc5R7J4gFEgBfbfO09';
+import UpgradeButton from '@/components/ui/UpgradeButton';
 
 const plans = [
   {
@@ -19,8 +13,7 @@ const plans = [
     description: 'Perfect for trying DealEdge AI on your first deals.',
     cta: 'Start Free',
     ctaHref: '/analyzer',
-    external: false,
-    plan: null,
+    plan: null as null | 'pro' | 'investor',
     highlighted: false,
     features: [
       '5 deal analyses per day',
@@ -37,10 +30,9 @@ const plans = [
     period: '/month',
     badge: 'Most Popular',
     description: 'Everything you need for active wholesaling and flipping.',
-    cta: EARLY_ACCESS ? 'Join Early Access — Free' : 'Upgrade to Pro',
-    ctaHref: EARLY_ACCESS ? '/analyzer' : STRIPE_PRO_LINK,
-    external: !EARLY_ACCESS,
-    plan: 'pro',
+    cta: EARLY_ACCESS ? 'Join Early Access — Free' : 'Upgrade to Pro — $9/mo',
+    ctaHref: '/analyzer',
+    plan: 'pro' as const,
     highlighted: true,
     features: [
       'Unlimited deal analyses',
@@ -58,10 +50,9 @@ const plans = [
     price: '$19',
     period: '/month',
     description: 'For serious investors running multiple deals at once.',
-    cta: EARLY_ACCESS ? 'Join Early Access — Free' : 'Upgrade to Investor',
-    ctaHref: EARLY_ACCESS ? '/analyzer' : STRIPE_INVESTOR_LINK,
-    external: !EARLY_ACCESS,
-    plan: 'investor',
+    cta: EARLY_ACCESS ? 'Join Early Access — Free' : 'Upgrade to Investor — $19/mo',
+    ctaHref: '/analyzer',
+    plan: 'investor' as const,
     highlighted: false,
     features: [
       'Everything in Pro',
@@ -165,21 +156,8 @@ export default function PricingPlans({ compact = false }: { compact?: boolean })
                 ))}
               </ul>
 
-              {plan.external ? (
-                <a
-                  href={plan.ctaHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    'block text-center py-3 rounded-xl font-bold text-sm transition-all',
-                    plan.highlighted
-                      ? 'bg-white text-indigo-700 hover:bg-indigo-50'
-                      : 'bg-zinc-900 text-white hover:bg-zinc-700',
-                  )}
-                >
-                  {plan.cta}
-                </a>
-              ) : (
+              {/* CTA */}
+              {plan.plan === null || EARLY_ACCESS ? (
                 <Link
                   href={plan.ctaHref}
                   className={cn(
@@ -191,6 +169,18 @@ export default function PricingPlans({ compact = false }: { compact?: boolean })
                 >
                   {plan.cta}
                 </Link>
+              ) : (
+                <UpgradeButton
+                  plan={plan.plan}
+                  className={cn(
+                    'w-full text-center py-3 rounded-xl font-bold text-sm transition-all',
+                    plan.highlighted
+                      ? 'bg-white text-indigo-700 hover:bg-indigo-50'
+                      : 'bg-zinc-900 text-white hover:bg-zinc-700',
+                  )}
+                >
+                  {plan.cta}
+                </UpgradeButton>
               )}
             </div>
           ))}

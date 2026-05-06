@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 
+// Hardcoded live Price IDs — override via env vars if needed
 const PRICE_IDS: Record<string, string> = {
-  pro: process.env.STRIPE_PRICE_PRO ?? '',
-  investor: process.env.STRIPE_PRICE_INVESTOR ?? '',
+  pro: process.env.STRIPE_PRICE_PRO ?? 'price_1TU7u3F06Hfcf6GZyrrEglGl',
+  investor: process.env.STRIPE_PRICE_INVESTOR ?? 'price_1TU7vBF06Hfcf6GZvKgn8m5Z',
 };
 
 export async function POST(request: NextRequest) {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { plan, successUrl, cancelUrl } = await request.json();
+    const { plan, email } = await request.json();
     const priceId = PRICE_IDS[plan as string];
 
     if (!priceId) {
@@ -30,9 +31,10 @@ export async function POST(request: NextRequest) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      success_url: successUrl ?? `${request.nextUrl.origin}/upgrade/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl ?? `${request.nextUrl.origin}/pricing`,
+      success_url: `${request.nextUrl.origin}/upgrade/success?session_id={CHECKOUT_SESSION_ID}&plan=${plan}`,
+      cancel_url: `${request.nextUrl.origin}/pricing`,
       allow_promotion_codes: true,
+      customer_email: email ?? undefined,
       metadata: { plan },
     });
 
