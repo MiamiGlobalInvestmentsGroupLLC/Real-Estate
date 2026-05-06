@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { EARLY_ACCESS, FREE_DAILY_LIMIT } from '@/lib/config';
 
 export type Plan = 'free' | 'pro' | 'investor';
 
@@ -31,7 +32,6 @@ const AppContext = createContext<AppContextValue | null>(null);
 const USERS_KEY = 'dealedge_users';
 const SESSION_KEY = 'dealedge_session';
 const USAGE_KEY = 'dealedge_usage';
-const FREE_LIMIT = 5;
 
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -117,19 +117,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(USERS_KEY, JSON.stringify(users));
   }, [user]);
 
-  // Returns true if analysis allowed, false if limit hit
+  // Returns true if analysis is allowed, false if blocked.
+  // In early access mode tracking always happens but never blocks.
   const incrementUsage = useCallback((): boolean => {
-    const plan = user?.plan ?? 'free';
-    if (plan !== 'free') return true;
-
+    // Always record the usage count for future monetization decisions
     const usage = readUsage();
-    if (usage.count >= FREE_LIMIT) {
-      setShowUpgradeModal(true);
-      return false;
-    }
     const updated = { count: usage.count + 1, date: today() };
     localStorage.setItem(USAGE_KEY, JSON.stringify(updated));
     setUsageCount(updated.count);
+
+    // Early access: unlimited for everyone
+    if (EARLY_ACCESS) return true;
+
+    // Future paywall path (active when EARLY_ACCESS = false)
+    const plan = user?.plan ?? 'free';
+    if (plan !== 'free') return true;
+    if (usage.count >= FREE_DAILY_LIMIT) {
+      setShowUpgradeModal(true);
+      return false;
+    }
     return true;
   }, [user]);
 

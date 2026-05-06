@@ -2,9 +2,13 @@
 
 import Link from 'next/link';
 import { useApp } from '@/context/AppContext';
+import { EARLY_ACCESS } from '@/lib/config';
 
 export default function UpgradeModal() {
   const { showUpgradeModal, setShowUpgradeModal, user } = useApp();
+
+  // Never interrupt in early access mode
+  if (EARLY_ACCESS) return null;
 
   if (!showUpgradeModal) return null;
 
