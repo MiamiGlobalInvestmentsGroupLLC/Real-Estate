@@ -12,6 +12,11 @@ export interface UserProfile {
   company: string;
   phone: string;
   plan: Plan;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  subscriptionStatus?: 'active' | 'canceled' | 'past_due';
+  subscriptionCurrentPeriodEnd?: string;
+  subscriptionValidated?: boolean;
 }
 
 interface AppContextValue {

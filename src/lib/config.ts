@@ -7,3 +7,6 @@
 export const EARLY_ACCESS = true;
 
 export const FREE_DAILY_LIMIT = 5;
+
+export const STRIPE_PRO_LINK = 'https://buy.stripe.com/bJe7sL9XJaVg89884JbfO08';
+export const STRIPE_INVESTOR_LINK = 'https://buy.stripe.com/bJe14nc5R7J4gFEgBfbfO09';

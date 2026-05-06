@@ -1,5 +1,15 @@
+'use client';
+
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { EARLY_ACCESS } from '@/lib/config';
+
+// Set these to your Stripe Payment Link URLs.
+// In your Stripe Dashboard, configure the success URL for each payment link to:
+//   https://your-domain.com/upgrade/success?session_id={CHECKOUT_SESSION_ID}&plan=pro
+//   https://your-domain.com/upgrade/success?session_id={CHECKOUT_SESSION_ID}&plan=investor
+const STRIPE_PRO_LINK = 'https://buy.stripe.com/bJe7sL9XJaVg89884JbfO08';
+const STRIPE_INVESTOR_LINK = 'https://buy.stripe.com/bJe14nc5R7J4gFEgBfbfO09';
 
 const plans = [
   {
@@ -9,6 +19,8 @@ const plans = [
     description: 'Perfect for trying DealEdge AI on your first deals.',
     cta: 'Start Free',
     ctaHref: '/analyzer',
+    external: false,
+    plan: null,
     highlighted: false,
     features: [
       '5 deal analyses per day',
@@ -25,34 +37,39 @@ const plans = [
     period: '/month',
     badge: 'Most Popular',
     description: 'Everything you need for active wholesaling and flipping.',
-    cta: 'Start Pro',
-    ctaHref: '/pricing',
+    cta: EARLY_ACCESS ? 'Join Early Access — Free' : 'Upgrade to Pro',
+    ctaHref: EARLY_ACCESS ? '/analyzer' : STRIPE_PRO_LINK,
+    external: !EARLY_ACCESS,
+    plan: 'pro',
     highlighted: true,
     features: [
       'Unlimited deal analyses',
       'Full AI decision engine',
       'SMS Deal Engine',
+      'Offer generator (PDF + SMS)',
       'Red flag auto-detection',
       'Save & track deals',
-      'Priority support',
+      'Multi-strategy analysis',
     ],
-    missing: ['Offer generator (PDF + SMS)', 'Export reports'],
+    missing: ['Export reports', 'Priority onboarding call'],
   },
   {
     name: 'Investor',
     price: '$19',
     period: '/month',
     description: 'For serious investors running multiple deals at once.',
-    cta: 'Start Investor',
-    ctaHref: '/pricing',
+    cta: EARLY_ACCESS ? 'Join Early Access — Free' : 'Upgrade to Investor',
+    ctaHref: EARLY_ACCESS ? '/analyzer' : STRIPE_INVESTOR_LINK,
+    external: !EARLY_ACCESS,
+    plan: 'investor',
     highlighted: false,
     features: [
       'Everything in Pro',
-      'Offer generator (PDF + SMS)',
       'Advanced deal scoring',
       'Export reports',
       'Deal history & analytics',
       'Priority onboarding call',
+      'Dedicated account manager',
     ],
     missing: [],
   },
@@ -67,11 +84,20 @@ export default function PricingPlans({ compact = false }: { compact?: boolean })
           <h2 className="text-3xl sm:text-4xl font-extrabold text-zinc-900 mb-4">
             More affordable than the competition
           </h2>
-          <p className="text-base text-zinc-500 max-w-xl mx-auto">
-            Avoiding one bad deal saves you{' '}
-            <span className="font-semibold text-zinc-700">$10,000 or more</span>.
-            DealEdge AI pays for itself on the first deal.
-          </p>
+          {EARLY_ACCESS ? (
+            <p className="text-base text-zinc-500 max-w-xl mx-auto">
+              <span className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold px-3 py-1 rounded-full">
+                <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                Early Access — Fully Unlimited Free
+              </span>
+            </p>
+          ) : (
+            <p className="text-base text-zinc-500 max-w-xl mx-auto">
+              Avoiding one bad deal saves you{' '}
+              <span className="font-semibold text-zinc-700">$10,000 or more</span>.
+              DealEdge AI pays for itself on the first deal.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
@@ -115,10 +141,7 @@ export default function PricingPlans({ compact = false }: { compact?: boolean })
                   <li key={f} className="flex items-start gap-2.5">
                     <svg
                       className={cn('w-4 h-4 mt-0.5 shrink-0', plan.highlighted ? 'text-indigo-300' : 'text-emerald-500')}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={3}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                     </svg>
@@ -131,10 +154,7 @@ export default function PricingPlans({ compact = false }: { compact?: boolean })
                   <li key={f} className="flex items-start gap-2.5 opacity-40">
                     <svg
                       className={cn('w-4 h-4 mt-0.5 shrink-0', plan.highlighted ? 'text-indigo-400' : 'text-zinc-400')}
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2.5}
+                      fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
@@ -145,24 +165,40 @@ export default function PricingPlans({ compact = false }: { compact?: boolean })
                 ))}
               </ul>
 
-              <Link
-                href={plan.ctaHref}
-                className={cn(
-                  'block text-center py-3 rounded-xl font-bold text-sm transition-all',
-                  plan.highlighted
-                    ? 'bg-white text-indigo-700 hover:bg-indigo-50'
-                    : 'bg-zinc-900 text-white hover:bg-zinc-700',
-                )}
-              >
-                {plan.cta}
-              </Link>
+              {plan.external ? (
+                <a
+                  href={plan.ctaHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={cn(
+                    'block text-center py-3 rounded-xl font-bold text-sm transition-all',
+                    plan.highlighted
+                      ? 'bg-white text-indigo-700 hover:bg-indigo-50'
+                      : 'bg-zinc-900 text-white hover:bg-zinc-700',
+                  )}
+                >
+                  {plan.cta}
+                </a>
+              ) : (
+                <Link
+                  href={plan.ctaHref}
+                  className={cn(
+                    'block text-center py-3 rounded-xl font-bold text-sm transition-all',
+                    plan.highlighted
+                      ? 'bg-white text-indigo-700 hover:bg-indigo-50'
+                      : 'bg-zinc-900 text-white hover:bg-zinc-700',
+                  )}
+                >
+                  {plan.cta}
+                </Link>
+              )}
             </div>
           ))}
         </div>
 
         {!compact && (
           <p className="text-center text-sm text-zinc-400 mt-8">
-            All plans include a 14-day money-back guarantee. Cancel anytime.
+            All paid plans include a 14-day money-back guarantee · Cancel anytime from your dashboard
           </p>
         )}
       </div>

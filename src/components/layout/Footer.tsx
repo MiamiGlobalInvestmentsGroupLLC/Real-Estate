@@ -33,11 +33,12 @@ export default function Footer() {
             <ul className="space-y-2">
               {[
                 { href: '/analyzer', label: 'Deal Analyzer' },
-                { href: '/analyzer#sms', label: 'SMS Engine' },
-                { href: '/analyzer#offer', label: 'Offer Generator' },
+                { href: '/analyzer', label: 'SMS Engine' },
+                { href: '/analyzer', label: 'Offer Generator' },
                 { href: '/pricing', label: 'Pricing' },
+                { href: '/dashboard', label: 'Dashboard' },
               ].map((item) => (
-                <li key={item.href}>
+                <li key={item.label}>
                   <Link href={item.href} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
                     {item.label}
                   </Link>
@@ -51,10 +52,10 @@ export default function Footer() {
             <p className="text-xs font-semibold text-zinc-900 uppercase tracking-wider mb-3">Company</p>
             <ul className="space-y-2">
               {[
-                { href: '#', label: 'About' },
-                { href: '#', label: 'Privacy Policy' },
-                { href: '#', label: 'Terms of Service' },
-                { href: '#', label: 'Contact' },
+                { href: '/about', label: 'About' },
+                { href: '/contact', label: 'Contact' },
+                { href: '/privacy', label: 'Privacy Policy' },
+                { href: '/terms', label: 'Terms of Service' },
               ].map((item) => (
                 <li key={item.label}>
                   <Link href={item.href} className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors">
@@ -68,7 +69,7 @@ export default function Footer() {
 
         <div className="mt-10 pt-6 border-t border-zinc-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-zinc-400">
-            © {new Date().getFullYear()} DealEdge AI. All rights reserved.
+            © {new Date().getFullYear()} Miami Global Investments Group LLC. All rights reserved.
           </p>
           <p className="text-xs text-zinc-400">
             Results are estimates. Always verify with licensed professionals.
