@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,16 +12,23 @@ export default function AdminLoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const res = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
-    });
-    setLoading(false);
-    if (res.ok) {
-      router.push('/admin/dashboard');
-    } else {
-      setError('Invalid admin credentials');
+    try {
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.ok) {
+        // Full page navigation so the browser sends the new cookie to middleware
+        window.location.href = '/admin/dashboard';
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Invalid admin credentials');
+        setLoading(false);
+      }
+    } catch {
+      setError('Network error. Please try again.');
+      setLoading(false);
     }
   };
 
