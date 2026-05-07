@@ -76,37 +76,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [usageCount, setUsageCount] = useState(0);
 
   useEffect(() => {
-    const supabase = createClient();
-
-    async function loadProfile(userId: string) {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      if (data) setUser(rowToProfile(data as Record<string, unknown>));
-    }
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        loadProfile(session.user.id).finally(() => setIsLoading(false));
-      } else {
-        setIsLoading(false);
-      }
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        loadProfile(session.user.id);
-      } else {
-        setUser(null);
-      }
-    });
-
     const usage = readUsage();
     setUsageCount(usage.count);
 
-    return () => subscription.unsubscribe();
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      setIsLoading(false);
+      return;
+    }
+
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    try {
+      const supabase = createClient();
+
+      const loadProfile = async (userId: string) => {
+        try {
+          const { data } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          if (data) setUser(rowToProfile(data as Record<string, unknown>));
+        } catch {
+          // profiles table may not exist yet
+        }
+      };
+
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          loadProfile(session.user.id).finally(() => setIsLoading(false));
+        } else {
+          setIsLoading(false);
+        }
+      }).catch(() => setIsLoading(false));
+
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          loadProfile(session.user.id);
+        } else {
+          setUser(null);
+        }
+      });
+      subscription = data.subscription;
+    } catch {
+      setIsLoading(false);
+    }
+
+    return () => subscription?.unsubscribe();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
