@@ -1,20 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { type NextRequest, NextResponse } from 'next/server';
-import { verifyAdminToken } from '@/lib/adminAuth';
 
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  // ── Admin route protection ────────────────────────────────────────────────
-  if (pathname.startsWith('/admin')) {
-    if (pathname === '/admin/login') return NextResponse.next();
-    const token = request.cookies.get('admin_token')?.value;
-    if (!token || !verifyAdminToken(token)) {
-      return NextResponse.redirect(new URL('/admin/login', request.url));
-    }
-    return NextResponse.next();
-  }
-
   // ── Supabase session refresh ───────────────────────────────────────────────
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
