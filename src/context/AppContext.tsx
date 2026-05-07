@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { EARLY_ACCESS, FREE_DAILY_LIMIT } from '@/lib/config';
+import { createClient } from '@/lib/supabase/client';
 
 export type Plan = 'free' | 'pro' | 'investor';
 
@@ -24,8 +25,8 @@ interface AppContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
   signup: (email: string, password: string, name: string) => Promise<{ error?: string }>;
-  logout: () => void;
-  updateProfile: (updates: Partial<UserProfile>) => void;
+  logout: () => Promise<void>;
+  updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   showUpgradeModal: boolean;
   setShowUpgradeModal: (v: boolean) => void;
   usageCount: number;
@@ -34,8 +35,6 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-const USERS_KEY = 'dealedge_users';
-const SESSION_KEY = 'dealedge_session';
 const USAGE_KEY = 'dealedge_usage';
 
 function today() {
@@ -54,6 +53,22 @@ function readUsage(): { count: number; date: string } {
   }
 }
 
+function rowToProfile(row: Record<string, unknown>): UserProfile {
+  return {
+    id: row.id as string,
+    email: row.email as string,
+    name: (row.name as string) || '',
+    company: (row.company as string) || '',
+    phone: (row.phone as string) || '',
+    plan: (row.plan as Plan) || 'free',
+    stripeCustomerId: (row.stripe_customer_id as string) || undefined,
+    stripeSubscriptionId: (row.stripe_subscription_id as string) || undefined,
+    subscriptionStatus: (row.subscription_status as UserProfile['subscriptionStatus']) || undefined,
+    subscriptionCurrentPeriodEnd: (row.subscription_current_period_end as string) || undefined,
+    subscriptionValidated: (row.subscription_validated as boolean) || false,
+  };
+}
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,80 +76,102 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [usageCount, setUsageCount] = useState(0);
 
   useEffect(() => {
-    const sessionId = localStorage.getItem(SESSION_KEY);
-    if (sessionId) {
-      const users: UserProfile[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-      const found = users.find((u) => u.id === sessionId);
-      if (found) setUser(found);
+    const supabase = createClient();
+
+    async function loadProfile(userId: string) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      if (data) setUser(rowToProfile(data as Record<string, unknown>));
     }
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        loadProfile(session.user.id).finally(() => setIsLoading(false));
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        loadProfile(session.user.id);
+      } else {
+        setUser(null);
+      }
+    });
+
     const usage = readUsage();
     setUsageCount(usage.count);
-    setIsLoading(false);
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const users: UserProfile[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const creds: Record<string, string> = JSON.parse(localStorage.getItem('dealedge_creds') || '{}');
-    const found = users.find((u) => u.email.toLowerCase() === email.toLowerCase());
-    if (!found || creds[found.id] !== password) {
-      return { error: 'Invalid email or password' };
-    }
-    localStorage.setItem(SESSION_KEY, found.id);
-    setUser(found);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { error: 'Invalid email or password' };
     return {};
   }, []);
 
   const signup = useCallback(async (email: string, password: string, name: string) => {
-    const users: UserProfile[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    if (users.find((u) => u.email.toLowerCase() === email.toLowerCase())) {
-      return { error: 'An account with this email already exists' };
+    const supabase = createClient();
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      if (error.message.includes('already registered')) {
+        return { error: 'An account with this email already exists' };
+      }
+      return { error: error.message };
     }
-    const newUser: UserProfile = {
-      id: crypto.randomUUID(),
-      email,
-      name,
-      company: '',
-      phone: '',
-      plan: 'free',
-    };
-    users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    const creds: Record<string, string> = JSON.parse(localStorage.getItem('dealedge_creds') || '{}');
-    creds[newUser.id] = password;
-    localStorage.setItem('dealedge_creds', JSON.stringify(creds));
-    localStorage.setItem(SESSION_KEY, newUser.id);
-    setUser(newUser);
+    if (data.user) {
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        email,
+        name,
+        plan: 'free',
+      });
+    }
     return {};
   }, []);
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
+  const logout = useCallback(async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
     setUser(null);
   }, []);
 
-  const updateProfile = useCallback((updates: Partial<UserProfile>) => {
+  const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
     if (!user) return;
-    const updated = { ...user, ...updates };
-    setUser(updated);
-    const users: UserProfile[] = JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-    const idx = users.findIndex((u) => u.id === updated.id);
-    if (idx !== -1) users[idx] = updated;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    const optimistic = { ...user, ...updates };
+    setUser(optimistic);
+
+    const supabase = createClient();
+    const dbUpdates: Record<string, unknown> = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.company !== undefined) dbUpdates.company = updates.company;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.plan !== undefined) dbUpdates.plan = updates.plan;
+    if (updates.stripeCustomerId !== undefined) dbUpdates.stripe_customer_id = updates.stripeCustomerId;
+    if (updates.stripeSubscriptionId !== undefined) dbUpdates.stripe_subscription_id = updates.stripeSubscriptionId;
+    if (updates.subscriptionStatus !== undefined) dbUpdates.subscription_status = updates.subscriptionStatus;
+    if (updates.subscriptionCurrentPeriodEnd !== undefined) dbUpdates.subscription_current_period_end = updates.subscriptionCurrentPeriodEnd;
+    if (updates.subscriptionValidated !== undefined) dbUpdates.subscription_validated = updates.subscriptionValidated;
+
+    if (Object.keys(dbUpdates).length > 0) {
+      await supabase.from('profiles').update(dbUpdates).eq('id', user.id);
+    }
   }, [user]);
 
-  // Returns true if analysis is allowed, false if blocked.
-  // In early access mode tracking always happens but never blocks.
   const incrementUsage = useCallback((): boolean => {
-    // Always record the usage count for future monetization decisions
     const usage = readUsage();
     const updated = { count: usage.count + 1, date: today() };
     localStorage.setItem(USAGE_KEY, JSON.stringify(updated));
     setUsageCount(updated.count);
 
-    // Early access: unlimited for everyone
     if (EARLY_ACCESS) return true;
 
-    // Future paywall path (active when EARLY_ACCESS = false)
     const plan = user?.plan ?? 'free';
     if (plan !== 'free') return true;
     if (usage.count >= FREE_DAILY_LIMIT) {
