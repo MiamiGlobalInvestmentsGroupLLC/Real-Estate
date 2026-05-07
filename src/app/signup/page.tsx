@@ -19,12 +19,17 @@ export default function SignupPage() {
     setError('');
     if (password.length < 6) { setError('Password must be at least 6 characters'); return; }
     setLoading(true);
-    const result = await signup(email, password, name);
-    setLoading(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.push('/analyzer');
+    try {
+      const result = await signup(email, password, name);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.push('/analyzer');
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
