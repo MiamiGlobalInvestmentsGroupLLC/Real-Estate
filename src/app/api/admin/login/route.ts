@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { timingSafeEqual } from 'crypto';
 import { createAdminToken } from '@/lib/adminAuth';
 
 export async function POST(request: NextRequest) {
   const { email, password } = await request.json();
 
-  const expectedEmail = process.env.ADMIN_EMAIL!;
-  const expectedPassword = process.env.ADMIN_PASSWORD!;
+  const expectedEmail = (process.env.ADMIN_EMAIL ?? '').trim();
+  const expectedPassword = (process.env.ADMIN_PASSWORD ?? '').trim();
 
-  const emailMatch = email === expectedEmail;
-  const passwordMatch =
-    password.length === expectedPassword.length &&
-    timingSafeEqual(Buffer.from(password), Buffer.from(expectedPassword));
+  if (!expectedEmail || !expectedPassword) {
+    return NextResponse.json({ error: 'Admin not configured' }, { status: 500 });
+  }
+
+  const emailMatch = email.trim() === expectedEmail;
+  const passwordMatch = password === expectedPassword;
 
   if (!emailMatch || !passwordMatch) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
