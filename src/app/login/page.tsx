@@ -17,12 +17,17 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await login(email, password);
-    setLoading(false);
-    if (result.error) {
-      setError(result.error);
-    } else {
-      router.push('/analyzer');
+    try {
+      const result = await login(email, password);
+      if (result.error) {
+        setError(result.error);
+      } else {
+        router.push('/analyzer');
+      }
+    } catch {
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

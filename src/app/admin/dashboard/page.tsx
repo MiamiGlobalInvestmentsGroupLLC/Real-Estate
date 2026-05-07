@@ -46,11 +46,11 @@ export default function AdminDashboard() {
 
   const loadUsers = useCallback(async () => {
     const res = await fetch('/api/admin/users');
-    if (res.status === 401) { router.push('/admin/login'); return; }
+    if (res.status === 401) { window.location.href = '/admin/login'; return; }
     const data = await res.json();
     setUsers(data.users || []);
     setLoading(false);
-  }, [router]);
+  }, []);
 
   useEffect(() => { loadUsers(); }, [loadUsers]);
 
